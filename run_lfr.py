@@ -11,15 +11,19 @@ import sys
 from helpers import update_progress, normalize, total_correlation
 
 
-k = int(sys.argv[3])
-dataset = sys.argv[1]
-norm_ = int(sys.argv[2])
+#k = int(sys.argv[2])
+#dataset = sys.argv[0]
+#norm_ = int(sys.argv[1])
+
+k = 10
+dataset = 'german'
+norm_ = 20
 
 # k=10
 # dataset = 'gps'
 # norm_=20
 
-with open('raw_data/'+dataset+'.numeric.processed') as f:
+with open('data/'+dataset+'.numeric.processed') as f:
     dat = np.array([list(map(float, x)) for x in map(lambda x: x.split(), f)])
 
 # print dat.shape
@@ -33,7 +37,7 @@ y = np.array(data[:,-1]).flatten()
 data = data[:,:-1]
 sensitive = data[:,-1]
 
-print 'total instances: '+ str(data.shape)
+print('total instances: '+ str(data.shape))
 # data = preprocessing.scale(data)
 data = normalize(data,norm_)
 
@@ -53,16 +57,16 @@ data_nonsensitive = data[nonsensitive_idx,:]
 y_sensitive = y[sensitive_idx]
 y_nonsensitive = y[nonsensitive_idx]
 
-print 'sensitive instances: '+str(data_sensitive.shape)
-print 'nonsensitive instances: '+str(data_nonsensitive.shape)
+print('sensitive instances: '+str(data_sensitive.shape))
+print('nonsensitive instances: '+str(data_nonsensitive.shape))
 
 import random
 random.seed(1)
 
 train_set_ratio = 0.7
-print '\n'
-print 'shuffle sensitive data...'
-random.shuffle(zip(data_sensitive, y_sensitive))
+print('\n')
+print('shuffle sensitive data...')
+random.shuffle(list(zip(data_sensitive, y_sensitive)))
 
 training_sensitive = data_sensitive[:int(data_sensitive.shape[0]*train_set_ratio)]
 ytrain_sensitive = y_sensitive[:int(data_sensitive.shape[0]*train_set_ratio)]
@@ -72,14 +76,13 @@ ytrain_sensitive = y_sensitive[:int(data_sensitive.shape[0]*train_set_ratio)]
 test_sensitive = data_sensitive[int(data_sensitive.shape[0]*train_set_ratio):]
 ytest_sensitive = y_sensitive[int(data_sensitive.shape[0]*train_set_ratio):]
 
-print 'Sensitive training data: '+str(training_sensitive.shape)
-print 'Sensitive test data: '+str(test_sensitive.shape)
+print('Sensitive training data: '+str(training_sensitive.shape))
+print('Sensitive test data: '+str(test_sensitive.shape))
 # training_sensitive = random.sample()
-print '\n'
 # idx=indices[2]
 
-print 'shuffle nonsensitive data...'
-random.shuffle(zip(data_nonsensitive,y_nonsensitive))
+print('shuffle nonsensitive data...')
+random.shuffle(list(zip(data_nonsensitive,y_nonsensitive)))
 
 training_nonsensitive = data_nonsensitive[:int(data_nonsensitive.shape[0]*train_set_ratio)]
 ytrain_nonsensitive = y_nonsensitive[:int(data_nonsensitive.shape[0]*train_set_ratio)]
@@ -88,9 +91,9 @@ ytrain_nonsensitive = y_nonsensitive[:int(data_nonsensitive.shape[0]*train_set_r
 test_nonsensitive = data_nonsensitive[int(data_nonsensitive.shape[0]*train_set_ratio):]
 ytest_nonsensitive = y_nonsensitive[int(data_nonsensitive.shape[0]*train_set_ratio):]
 
-print 'Nonsensitive training data: '+str(training_nonsensitive.shape)
-print 'Nonsensitive test data: '+str(test_nonsensitive.shape)
-print '\n'
+print('Nonsensitive training data: '+str(training_nonsensitive.shape))
+print('Nonsensitive test data: '+str(test_nonsensitive.shape))
+print('\n')
 
 training = np.concatenate((training_sensitive, training_nonsensitive))
 ytrain = np.concatenate((ytrain_sensitive, ytrain_nonsensitive))
@@ -98,12 +101,12 @@ ytrain = np.concatenate((ytrain_sensitive, ytrain_nonsensitive))
 test = np.concatenate((test_sensitive, test_nonsensitive))
 ytest = np.concatenate((ytest_sensitive, ytest_nonsensitive))
 
-print 'Whole training dataset: '+str(training.shape)
-print 'Whole test dataset: '+str(test.shape)
-print '\n'
+print('Whole training dataset: '+str(training.shape))
+print('Whole test dataset: '+str(test.shape))
+print('\n')
 
 
-print 'Initialize w and v...\n'
+print('Initialize w and v...\n')
 rez = np.random.uniform(size=data.shape[1] * 2 + k + data.shape[1] * k)
 
 
@@ -142,7 +145,7 @@ for i, k2 in enumerate(rez):
     else:
         bnd.append((0, 1))
 
-print 'begin optimizing...'
+print('begin optimizing...')
 
 rez = optim.fmin_l_bfgs_b(LFR, x0=rez, epsilon=1e-5,
                           args=(training_sensitive, training_nonsensitive,
@@ -198,7 +201,7 @@ KS, recall, precision, f1, parity_dev, parity_sub, event_rate = evaluate_perform
 
 result = [KS, recall, precision, f1, parity_dev, parity_sub]
 # print result
-print 'threshold: '+str(np.round(event_rate,4))
+print('threshold: '+str(np.round(event_rate,4)))
 from pyemd import emd_samples
 
 def cal_emd_resamp(A,B,n_samp,times):
@@ -246,5 +249,5 @@ mse = np.mean(np.power(test_X-raw_X, 2))
 
 result.append(np.round(mse,4))
 
-print ['ks', ' recall', ' prec', ' f1','  par_div','par_sub','emd','consis','mse']
-print result
+print(['ks', ' recall', ' prec', ' f1','  par_div','par_sub','emd','consis','mse'])
+print(result)
