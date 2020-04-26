@@ -88,7 +88,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     P = torch.tensor(P).long().cuda()
     train_rep(model_nfr, 0.01, X, P, n_iter, 10, batch_size, alpha = alpha, C_reg=0, compute_emd=compute_emd, adv=True, verbose=True)
     results={}
-    
+
     print('begin testing.')
     X_ori_np = X.data.cpu().numpy()
     # Original.
@@ -152,8 +152,8 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     print('calculating stat diff...')
     performance.append(stat_diff(X_test, P_test, lin_model))
     results['AE'] = (performance)
-    
-    
+
+
     U_0 = model_ae_P.encoder(X[:,:-1][P==0]).data
     U_1 = model_ae_P.encoder(X[:,:-1][P==1]).data
     U = model_ae_P.encoder(X[:,:-1]).data
@@ -162,7 +162,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     data_train, data_test = split_data_np((U_np,P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
-    
+
     print('logistic regresison on AE-P...')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
@@ -210,7 +210,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
 
 
 # two batch of samples: one normal(0,1), and one uniform(0,1).
-with open('data/ppdai.processed') as f:
+with open('data/german.numeric.processed') as f:
     data_raw = np.array([list(map(float, x)) for x in map(lambda x: x.split(), f)])
     data_raw = np.array(data_raw)
 np.random.shuffle(data_raw)
@@ -249,7 +249,7 @@ batch_size = 2000
 n_iter = 20
 C=0.1
 alpha = 1000
-k_nbrs= 1 
+k_nbrs= 1
 
 n_test = 2
 results = {}
@@ -270,8 +270,7 @@ for k in range(n_test):
     else:
         for model in results:
             results[model] += np.array(results_this[model]) / n_test
-            
+
 print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs'])))
 for key, val in results.items():
     print('{0:40}: {1}'.format(key, ' '.join([str(np.round(x,3)) for x in val]).ljust(35)))
-
