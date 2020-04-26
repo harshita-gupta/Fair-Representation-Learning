@@ -212,7 +212,7 @@ def evaluate_performance_sim(all_target, predicted, P_label=None, more_eva=0):
                 sum(predicted[P_label == 0]) / sum(P_label == 0) - sum(predicted[P_label == 1]) / sum(P_label == 1))
             #         print stat_parity
             return np.round(ks, 4), np.round(recall_, 4)[0], np.round(precision_, 4)[0], np.round(f1_score, 4)[
-                0], np.round(stat_parity_dev, 4), np.round(stat_parity_sub, 4), round(thres, 3)
+                0], np.round(stat_parity_dev, 4), np.round(stat_parity_sub, 4), np.round(thres, 3)
         else:
             return np.round(ks, 4), np.round(recall_, 4)[0], np.round(precision_, 4)[0], np.round(f1_score, 4)[0]
     else:
