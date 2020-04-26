@@ -13,7 +13,7 @@ import torch.distributions as D
 import numpy as np
 from pyemd import emd_samples
 
-from model import FairTrans, FairRep
+from model import FairRep
 from helpers import update_progress, normalize, total_correlation, cal_emd_resamp
 import time
 import sys
