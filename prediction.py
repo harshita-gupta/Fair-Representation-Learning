@@ -71,21 +71,19 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     global X, P, y
     # AE.
     model_ae = FairRep(len(X[0]), n_dim)
-    model_ae.cuda()
-    X = torch.tensor(X).float().cuda()
-    P = torch.tensor(P).long().cuda()
+    X = torch.tensor(X).float()
+    P = torch.tensor(P).long()
     train_rep(model_ae, 0.01, X, P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
     # AE_P.
     model_ae_P = FairRep(len(X[0])-1, n_dim-1)
-    model_ae_P.cuda()
-    X = torch.tensor(X).float().cuda()
-    P = torch.tensor(P).long().cuda()
+    model_ae_P
+    X = torch.tensor(X).float()
+    P = torch.tensor(P).long()
     train_rep(model_ae_P, 0.01, X[:, :-1], P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
     # NFR.
     model_nfr = FairRep(len(X[0]), n_dim)
-    model_nfr.cuda()
-    X = torch.tensor(X).float().cuda()
-    P = torch.tensor(P).long().cuda()
+    X = torch.tensor(X).float()
+    P = torch.tensor(P).long()
     train_rep(model_nfr, 0.01, X, P, n_iter, 10, batch_size, alpha = alpha, C_reg=0, compute_emd=compute_emd, adv=True, verbose=True)
     results={}
 
@@ -212,11 +210,16 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
 # two batch of samples: one normal(0,1), and one uniform(0,1).
 with open('data/german.numeric.processed') as f:
     data_raw = np.array([list(map(float, x)) for x in map(lambda x: x.split(), f)])
+    print('raw data')
+    print(data_raw)
     data_raw = np.array(data_raw)
 np.random.shuffle(data_raw)
 P = data_raw[:, -2]
 y = data_raw[:, -1]
+print(y)
 X = data_raw[:, :-1]
+
+
 
 
 #parameter setting
