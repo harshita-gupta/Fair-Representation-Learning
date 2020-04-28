@@ -22,6 +22,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import NearestNeighbors
 from dumb_containers import split_data, evaluate_performance_sim
 
+import pandas as pd
+
 np.random.seed(1)
 
 
@@ -58,13 +60,7 @@ def get_consistency(X, classifier, n_neighbors, based_on=None):
 
 def stat_diff(X, P, model):
     scores = sigmoid(X.dot(model.coef_.T) + model.intercept_)
-    #score1 = np.mean(scores[P==1])
-    #score0 = np.mean(scores[P==0])
-    #return 1.0*max(score1,score0)/min(score1,score0)
     return np.abs(np.mean(scores[P==0]) - np.mean(scores[P==1]))
-
-
-# In[3]:
 
 
 def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3, emd_method=emd_samples):
@@ -200,7 +196,8 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     performance.append(stat_diff(X_test, P_test, lin_model))
     results['NFR'] = (performance)
 
-    return results
+    # return statistics and predictions.
+    return results, y_test_scores
 
 
 # In[4]:
@@ -216,7 +213,6 @@ with open('data/german.numeric.processed') as f:
 np.random.shuffle(data_raw)
 P = data_raw[:, -2]
 y = data_raw[:, -1]
-print(y)
 X = data_raw[:, :-1]
 
 
@@ -238,15 +234,6 @@ print(cal_emd_resamp(X[:,:-1][(y==0) & (P==0)], X[:,:-1][(y==0) & (P==1)], 50, 1
 
 X = torch.tensor(X).float()
 
-# In[9]:
-
-
-print(X.shape)
-
-
-# In[ ]:
-
-
 n_dim = 30
 batch_size = 2000
 n_iter = 20
@@ -256,8 +243,9 @@ k_nbrs= 1
 
 n_test = 2
 results = {}
+preds = {}
 for k in range(n_test):
-    results_this = test_in_one(n_dim=n_dim,
+    results_this, y_test_this = test_in_one(n_dim=n_dim,
                      batch_size=batch_size,
                      n_iter=n_iter,
                      C=C,
@@ -265,15 +253,23 @@ for k in range(n_test):
                     compute_emd=False,
                     k_nbrs=k_nbrs,
                     emd_method=lambda x,y: cal_emd_resamp(x, y, 50, 10))
-    #print(results_this)
+
     if k == 0:
         results = results_this
         for model in results:
-            results[model] = np.array(results_this[model])/n_test
+            results[model] = np.array(results_this[model])/ n_test
+            preds[model] = y_test_this / n_test
     else:
+        # take the average of all metrics + predictions so far
         for model in results:
             results[model] += np.array(results_this[model]) / n_test
+            preds[model] += y_test_this / n_test
 
+# make CSV dataframe to store predicted scores
+pred_df = pd.DataFrame(data = preds[model], columns = ['y_pred'])
+# TODO combine with csv
+print('Predicted y saved to compas_y_pred.csv')
 print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs'])))
 for key, val in results.items():
     print('{0:40}: {1}'.format(key, ' '.join([str(np.round(x,3)) for x in val]).ljust(35)))
+
