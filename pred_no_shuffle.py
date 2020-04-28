@@ -9,7 +9,7 @@ import torch
 import torch.nn as nzn
 import torch.optim as optim
 import torch.distributions as D
-import os
+import pandas as pd
 
 import numpy as np
 from pyemd import emd_samples
@@ -22,8 +22,6 @@ from train import train_rep
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import NearestNeighbors
 from dumb_containers import split_data, evaluate_performance_sim
-
-import pandas as pd
 
 np.random.seed(1)
 
@@ -61,15 +59,17 @@ def get_consistency(X, classifier, n_neighbors, based_on=None):
 
 def stat_diff(X, P, model):
     scores = sigmoid(X.dot(model.coef_.T) + model.intercept_)
+    #score1 = np.mean(scores[P==1])
+    #score0 = np.mean(scores[P==0])
+    #return 1.0*max(score1,score0)/min(score1,score0)
     return np.abs(np.mean(scores[P==0]) - np.mean(scores[P==1]))
 
-def shuffled_np(df):
-    return np.random.shuffle(df.values)
+
+# In[3]:
+
 
 def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3, emd_method=emd_samples):
-    global X, P, y, df
-
-    X_no_p = df.drop(['Y', 'P'], axis=1).values
+    global X, P, y
     # AE.
     model_ae = FairRep(len(X[0]), n_dim)
     X = torch.tensor(X).float()
@@ -80,7 +80,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     model_ae_P
     X = torch.tensor(X).float()
     P = torch.tensor(P).long()
-    train_rep(model_ae_P, 0.01,X_no_p , P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
+    train_rep(model_ae_P, 0.01, X[:, :-1], P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
     # NFR.
     model_nfr = FairRep(len(X[0]), n_dim)
     X = torch.tensor(X).float()
@@ -204,31 +204,26 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     return results, y_test_scores
 
 
+# In[4]:
+
+
+
 # two batch of samples: one normal(0,1), and one uniform(0,1).
-# with open('data/german.numeric.processed') as f:
-    # data_raw = np.array([list(map(float, x)) for x in map(lambda x: x.split(), f)])
-    # print('raw data')
-    # print(data_raw)
-    # data_raw = np.array(data_raw)
-#filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'compas_clean.csv')
-filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'german_clean.csv')
-try:
-    df = pd.read_csv(filepath)
-except IOError as err:
-    print('IO error')
+with open('data/german.numeric.processed') as f:
+    data_raw = np.array([list(map(float, x)) for x in map(lambda x: x.split(), f)])
+    print('raw data')
+    print(data_raw)
+    data_raw = np.array(data_raw)
+#np.random.shuffle(data_raw)
+P = data_raw[:, -2]
+y = data_raw[:, -1]
+X = data_raw[:, :-1]
 
-print(df.head())
-P = df['P'].values
-y = df['Y'].values
-
-print(df.shape)
-# X contains protected class P
-X = df.drop(['Y'], axis=1).values
 print('OF INTEREST')
 print(X[:,:-1])
 
-print('X shape')
-print(X.shape)
+
+
 
 #parameter setting
 X = normalize(X, 150)
@@ -238,7 +233,6 @@ X_n = X[P==0]
 print('original emd distance:')
 print(cal_emd_resamp(X_u, X_n, 50, 10))
 print('original emd distance without P:')
-
 print(cal_emd_resamp(X_u[:,:-1], X_n[:,:-1], 50, 10))
 print('original positive group distance without P:')
 print(cal_emd_resamp(X[:,:-1][(y==1) & (P==0)], X[:,:-1][(y==1) & (P==1)], 50, 10))
@@ -246,6 +240,15 @@ print('original negative group distance without P:')
 print(cal_emd_resamp(X[:,:-1][(y==0) & (P==0)], X[:,:-1][(y==0) & (P==1)], 50, 10))
 
 X = torch.tensor(X).float()
+
+# In[9]:
+
+
+print(X.shape)
+
+
+# In[ ]:
+
 
 n_dim = 30
 batch_size = 2000
@@ -280,7 +283,7 @@ for k in range(n_test):
 
 # make CSV dataframe to store predicted scores
 pred_df = pd.DataFrame(data = preds[model], columns = ['y_pred'])
-pred_df.to_csv('new_pred.csv')
+pred_df.to_csv('old_pred.csv')
 # TODO combine with csv
 print('Predicted y saved to compas_y_pred.csv')
 print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs'])))
