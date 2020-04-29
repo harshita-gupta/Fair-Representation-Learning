@@ -229,9 +229,6 @@ X = normalize(X, 150)
 X_u = X[P==1]
 X_n = X[P==0]
 
-print('x u')
-print(X_u)
-print(X_n)
 print('original emd distance:')
 print(cal_emd_resamp(X_u, X_n, 50, 10))
 print('original emd distance without P:')
