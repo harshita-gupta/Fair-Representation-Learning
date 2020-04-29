@@ -210,31 +210,25 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     # print('raw data')
     # print(data_raw)
     # data_raw = np.array(data_raw)
-#filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'compas_clean.csv')
-filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'german_clean.csv')
+filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'compas_clean.csv')
+#filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'german_clean.csv')
 try:
     df = pd.read_csv(filepath)
 except IOError as err:
     print('IO error')
 
-print(df.head())
 P = df['P'].values
 y = df['Y'].values
 
-print(df.shape)
 # X contains protected class P
 X = df.drop(['Y'], axis=1).values
-print('OF INTEREST')
-print(X[:,:-1])
-
-print('X shape')
-print(X.shape)
 
 #parameter setting
 X = normalize(X, 150)
 
 X_u = X[P==1]
 X_n = X[P==0]
+
 print('original emd distance:')
 print(cal_emd_resamp(X_u, X_n, 50, 10))
 print('original emd distance without P:')

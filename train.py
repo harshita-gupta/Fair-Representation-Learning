@@ -41,18 +41,21 @@ def train_rep(model, lr, X, P, n_iter, c_iter, batch_size,
 
     optim_encoder = optim.Adam(model.encoder.parameters(), lr=lr)
     optim_decoder = optim.Adam(model.decoder.parameters(), lr=lr)
-    print('Critic params:  ')
-    for c in model.critic:
-        print(c.parameters())
+    # print('Critic params:  ')
+    # for c in model.critic:
+    #     print(c.parameters())
     optim_crit = optim.Adam(model.critic[0].parameters(), lr=0.1)
 
     l1_crit = nn.L1Loss(size_average=False)
-
     n_of_batch = int(len(X) / (batch_size * 2)) * n_iter
-
+    print('vectors')
     for i in range(n_of_batch):
-        X_n = X_0[np.random.choice(len(X_0), batch_size)]
-        X_u = X_1[np.random.choice(len(X_1), batch_size)]
+        #X_n = X_0[np.random.choice(len(X_0), batch_size)]
+        #X_u = X_1[np.random.choice(len(X_1), batch_size)]
+
+        X_n = torch.tensor(X_0[np.random.choice(len(X_0), batch_size)]).float()
+        X_u = torch.tensor(X_1[np.random.choice(len(X_1), batch_size)]).float()
+
         if adv:
             w_dist_last = 0
             eps = 1
@@ -70,7 +73,7 @@ def train_rep(model, lr, X, P, n_iter, c_iter, batch_size,
                     # keep training crit until distance no longer decrease
                     w_dist_last = w_dist.data.item()
 
-                    for p in model.critic.parameters():
+                    for p in model.critic[0].parameters():
                         p.data.clamp_(-0.1, 0.1)
 
 
@@ -78,7 +81,7 @@ def train_rep(model, lr, X, P, n_iter, c_iter, batch_size,
         optim_encoder.zero_grad()
         optim_decoder.zero_grad()
 
-        # only use the encoder g
+        # only use the encoder
         mse, wdist = model.forward(X_n, X_u)
 
         if adv:

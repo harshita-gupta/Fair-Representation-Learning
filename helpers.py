@@ -14,8 +14,8 @@ def update_progress(i, total, start_time, text=''):
     now = time.time()
     used = prettytime(now-start_time)
     eta = prettytime((now-start_time) / (i+1) * (total-i-1))
-    output = ("\r%.2f%%, " % (100.0 * (i+1)/total) + 
-                 "%d/%d processed, " % (i+1, total) + text + 
+    output = ("\r%.2f%%, " % (100.0 * (i+1)/total) +
+                 "%d/%d processed, " % (i+1, total) + text +
                  "time used: %02d:%02d:%02d, eta: %02d:%02d:%02d" %
                 (used[0], used[1], used[2],
                 eta[0], eta[1], eta[2]))
@@ -48,7 +48,7 @@ def load_adult_data(url):
                 data_train[c] = data_train[c].astype(float)
 
     #data_train = pd.get_dummies(data_train, drop_first=True)
-    
+
     return data_train
 
 
@@ -87,9 +87,9 @@ def total_correlation(X, Y):
     S_XX = 1.0 * X.T.dot(X) / N
     S_YX = 1.0 * Y.T.dot(X) / N
     S_XY = 1.0 * X.T.dot(Y) / N
-    S_XX_inv = 1.0 * np.linalg.inv(S_XX) 
+    S_XX_inv = 1.0 * np.linalg.inv(S_XX)
     S_YY = 1.0 * Y.T.dot(Y) / N
-        
+
     R_sq = S_YX.dot(S_XX_inv).dot(S_XY) / S_YY
     return np.sqrt(R_sq)
 
@@ -99,5 +99,5 @@ def cal_emd_resamp(A,B,n_samp,times):
     for t in range(times):
         idx_a = np.random.choice(len(A), n_samp)
         idx_b = np.random.choice(len(B), n_samp)
-        emds.append(emd_samples(A[idx_a],B[idx_b]))
+        emds.append(emd_samples(A[idx_a],B[idx_b], bins=2))
     return np.mean(emds)

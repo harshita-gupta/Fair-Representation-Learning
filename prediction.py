@@ -84,59 +84,61 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     model_nfr = FairRep(len(X[0]), n_dim)
     X = torch.tensor(X).float()
     P = torch.tensor(P).long()
+
+    print('training NFR')
     train_rep(model_nfr, 0.01, X, P, n_iter, 10, batch_size, alpha = alpha, C_reg=0, compute_emd=compute_emd, adv=True, verbose=True)
     results={}
 
-    print('begin testing.')
+    # print('begin testing.')
     X_ori_np = X.data.cpu().numpy()
     # Original.
     data_train, data_test = split_data_np((X.data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
-    print('logistic regresison on the original...')
+    # print('logistic regresison on the original...')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
     #print(lin_model.coef_.shape)
     #int(X_train.shape)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
-    print('logistic regresison evaluation...')
+    # print('logistic regresison evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
-    print('calculating emd...')
+    # print('calculating emd...')
     performance.append(emd_method(X_n, X_u))
-    print('calculating consistency...')
+    # print('calculating consistency...')
     performance.append(get_consistency(X.data.cpu().numpy(), lin_model, n_neighbors=k_nbrs))
-    print('calculating stat diff...')
+    # print('calculating stat diff...')
     performance.append(stat_diff(X.data.cpu().numpy(), P, lin_model))
     results['Original'] = performance
     # Original-P.
     data_train, data_test = split_data_np((X[:, :-1].data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
-    print('logistic regresison on the original-P')
+    # print('logistic regresison on the original-P')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
-    print('logistic regresison evaluation...')
+    # print('logistic regresison evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
-    print('calculating emd...')
+    # print('calculating emd...')
     performance.append(emd_method(X_n[:,:-1], X_u[:,:-1]))
-    print('calculating consistency...')
+    # print('calculating consistency...')
     performance.append(get_consistency(X[:,:-1].data.cpu().numpy(), lin_model,  n_neighbors=k_nbrs))
-    print('calculating stat diff...')
+    # print('calculating stat diff...')
     performance.append(stat_diff(X[:,:-1].data.cpu().numpy(), P, lin_model))
     results['Original-P'] = (performance)
     U_0 = model_ae.encoder(X[P==0]).data
     U_1 = model_ae.encoder(X[P==1]).data
     U = model_ae.encoder(X).data
-    print('ae emd afterwards: ' + str(emd_method(U_0, U_1)))
+    # print('ae emd afterwards: ' + str(emd_method(U_0, U_1)))
     U_np = U.cpu().numpy()
     data_train, data_test = split_data_np((U_np,P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
 
-    print('logistic regresison on AE...')
+    # print('logistic regresison on AE...')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
 
