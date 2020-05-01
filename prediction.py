@@ -68,9 +68,10 @@ def stat_diff(X, P, model):
 
 
 def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3, emd_method=emd_samples):
-    global X, P, y
+    global X, X_unprot, P, y
     # AE.
     model_ae = FairRep(len(X[0]), n_dim)
+
     X = torch.tensor(X).float()
     P = torch.tensor(P).long()
     train_rep(model_ae, 0.01, X, P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
@@ -79,10 +80,10 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     model_ae_P
     X = torch.tensor(X).float()
     P = torch.tensor(P).long()
-    train_rep(model_ae_P, 0.01, X[:, :-1], P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
+    train_rep(model_ae_P, 0.01, X_unprot, P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
     # NFR.
     model_nfr = FairRep(len(X[0]), n_dim)
-    X = torch.tensor(X).float()
+    X0 = torch.tensor(X).float()
     P = torch.tensor(P).long()
 
     print('training NFR')
@@ -112,7 +113,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     performance.append(stat_diff(X.data.cpu().numpy(), P, lin_model))
     results['Original'] = performance
     # Original-P.
-    data_train, data_test = split_data_np((X[:, :-1].data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
+    data_train, data_test = split_data_np((X_unprot.data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
     # print('logistic regresison on the original-P')
@@ -123,11 +124,11 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     # print('logistic regresison evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
     # print('calculating emd...')
-    performance.append(emd_method(X_n[:,:-1], X_u[:,:-1]))
+    performance.append(emd_method(X_unprot[P==0], X_unprot[P==1]))
     # print('calculating consistency...')
-    performance.append(get_consistency(X[:,:-1].data.cpu().numpy(), lin_model,  n_neighbors=k_nbrs))
+    performance.append(get_consistency(X_unprot.data.cpu().numpy(), lin_model,  n_neighbors=k_nbrs))
     # print('calculating stat diff...')
-    performance.append(stat_diff(X[:,:-1].data.cpu().numpy(), P, lin_model))
+    performance.append(stat_diff(X_unprot.data.cpu().numpy(), P, lin_model))
     results['Original-P'] = (performance)
     U_0 = model_ae.encoder(X[P==0]).data
     U_1 = model_ae.encoder(X[P==1]).data
@@ -154,9 +155,9 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     results['AE'] = (performance)
 
 
-    U_0 = model_ae_P.encoder(X[:,:-1][P==0]).data
-    U_1 = model_ae_P.encoder(X[:,:-1][P==1]).data
-    U = model_ae_P.encoder(X[:,:-1]).data
+    U_0 = model_ae_P.encoder(X_unprot[P==0]).data
+    U_1 = model_ae_P.encoder(X_unprot[P==1]).data
+    U = model_ae_P.encoder(X_unprot).data
     print('ae-p emd afterwards: ' + str(emd_method(U_0, U_1)))
     U_np = U.cpu().numpy()
     data_train, data_test = split_data_np((U_np,P.data.cpu().numpy(),y), 0.7)
@@ -201,7 +202,6 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     print('calculating stat diff...')
     performance.append(stat_diff(X_test, P_test, lin_model))
     results['NFR'] = (performance)
-
     return results
 
 
@@ -227,19 +227,25 @@ X = data_raw[:, :-1]
 #parameter setting
 X = normalize(X, 150)
 
+# define which columns are unprotected
+X_unprot = X[:, :-1]
+
+# define which entries belong to each group
 X_u = X[P==1]
 X_n = X[P==0]
+Xu_up = X_unprot[P==1]
+Xn_up = X_unprot[P==0]
 print('original emd distance:')
 print(cal_emd_resamp(X_u, X_n, 50, 10))
 print('original emd distance without P:')
-print(cal_emd_resamp(X_u[:,:-1], X_n[:,:-1], 50, 10))
+print(cal_emd_resamp(Xu_up, Xn_up, 50, 10))
 print('original positive group distance without P:')
-print(cal_emd_resamp(X[:,:-1][(y==1) & (P==0)], X[:,:-1][(y==1) & (P==1)], 50, 10))
+print(cal_emd_resamp(X_unprot[(y==1) & (P==0)], X_unprot[(y==1) & (P==1)], 50, 10))
 print('original negative group distance without P:')
-print(cal_emd_resamp(X[:,:-1][(y==0) & (P==0)], X[:,:-1][(y==0) & (P==1)], 50, 10))
+print(cal_emd_resamp(X_unprot[(y==0) & (P==0)], X_unprot[(y==0) & (P==1)], 50, 10))
 
 X = torch.tensor(X).float()
-
+X_unprot = torch.tensor(X_unprot).float()
 # In[9]:
 
 
