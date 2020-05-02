@@ -1,10 +1,3 @@
-
-# coding: utf-8
-
-# In[1]:
-
-
-
 import torch
 import torch.nn as nzn
 import torch.optim as optim
@@ -67,7 +60,7 @@ def shuffled_np(df):
     return np.random.shuffle(df.values)
 
 def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3, emd_method=emd_samples):
-    global X, P, y, df
+    global X, P, y, df, X_test
 
     X_no_p = df.drop(['Y', 'P'], axis=1).values
     # AE.
@@ -101,6 +94,8 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     #int(X_train.shape)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
+    y_hats['Original'] = y_test_scores
+
     print('logistic regresison evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
     print('calculating emd...')
@@ -119,6 +114,8 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
+    y_hats['Original-P'] = y_test_scores
+
     print('logistic regresison evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
     print('calculating emd...')
@@ -142,6 +139,8 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
+    y_hats['AE'] = y_test_scores
+
     print('logistic regresison evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
     print('calculating emd...')
@@ -203,6 +202,16 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
 
     return results, y_test_scores
 
+def save_predictions(X_test, y_hat, model_name):
+    # make CSV dataframe to store predicted scores
+    print(X_test.shape)
+    print(y_hat.shape)
+    y_hat = y_hat.reshape(len(X_test), 1)
+    data_yhat = np.concatenate((X_test, y_hat), axis=1)
+    cols = list(df.columns[:-1])
+    cols.append('y_hat')
+    pred_df = pd.DataFrame(data = data_yhat, columns = cols)
+    pred_df.to_csv('preds_' + model_name + '.csv')
 
 # two batch of samples: one normal(0,1), and one uniform(0,1).
 # with open('data/german.numeric.processed') as f:
@@ -217,6 +226,9 @@ try:
 except IOError as err:
     print('IO error')
 
+print('num COLs:')
+print(len(list(df.columns)))
+
 P = df['P'].values
 y = df['Y'].values
 
@@ -225,6 +237,9 @@ X = df.drop(['Y'], axis=1).values
 
 #parameter setting
 X = normalize(X, 150)
+
+print('X zero')
+print(X[0])
 
 X_u = X[P==1]
 X_n = X[P==0]
@@ -250,6 +265,7 @@ k_nbrs= 1
 
 n_test = 2
 results = {}
+y_hats = {}
 preds = {}
 for k in range(n_test):
     results_this, y_test_this = test_in_one(n_dim=n_dim,
@@ -267,14 +283,16 @@ for k in range(n_test):
             results[model] = np.array(results_this[model])/ n_test
             preds[model] = y_test_this / n_test
     else:
-        # take the average of all metrics + predictions so far
         for model in results:
+            print('X zero')
+            print(X[0])
             results[model] += np.array(results_this[model]) / n_test
             preds[model] += y_test_this / n_test
 
-# make CSV dataframe to store predicted scores
-pred_df = pd.DataFrame(data = preds[model], columns = ['y_pred'])
-pred_df.to_csv('new_pred.csv')
+for key, val in preds.items():
+    save_predictions(X_test, preds[key], key)
+
+
 # TODO combine with csv
 print('Predicted y saved to compas_y_pred.csv')
 print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs'])))
