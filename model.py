@@ -36,7 +36,7 @@ class FairRep():
         else:
             self.critic = critic
 
-    def wdist(self, x_0, x_1, p):
+    def wdist(self, x_0, x_1, p=0):
         c_0 = self.critic[p](self.encoder(x_0))
         c_1 = self.critic[p](self.encoder(x_1))
         w_dist = torch.mean(c_0 - c_1)
@@ -54,7 +54,7 @@ class FairRep():
         for t in range(self.n_prot):
             self.critic[t] = self.critic[t].cpu()
 
-    def forward(self, x_0, x_rest, p):
+    def forward(self, x_0, x_rest, p=0):
         g_0 = self.encoder(x_0)
         g_1 = self.encoder(x_rest)
 

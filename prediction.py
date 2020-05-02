@@ -68,77 +68,78 @@ def stat_diff(X, P, model):
 
 
 def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3, emd_method=emd_samples):
-    global X, P, y
+    global X, X_unprot, P, y
     # AE.
     model_ae = FairRep(len(X[0]), n_dim)
-    model_ae.cuda()
-    X = torch.tensor(X).float().cuda()
-    P = torch.tensor(P).long().cuda()
+
+    X = torch.tensor(X).float()
+    P = torch.tensor(P).long()
     train_rep(model_ae, 0.01, X, P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
     # AE_P.
     model_ae_P = FairRep(len(X[0])-1, n_dim-1)
-    model_ae_P.cuda()
-    X = torch.tensor(X).float().cuda()
-    P = torch.tensor(P).long().cuda()
-    train_rep(model_ae_P, 0.01, X[:, :-1], P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
+    model_ae_P
+    X = torch.tensor(X).float()
+    P = torch.tensor(P).long()
+    train_rep(model_ae_P, 0.01, X_unprot, P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
     # NFR.
     model_nfr = FairRep(len(X[0]), n_dim)
-    model_nfr.cuda()
-    X = torch.tensor(X).float().cuda()
-    P = torch.tensor(P).long().cuda()
+    X0 = torch.tensor(X).float()
+    P = torch.tensor(P).long()
+
+    print('training NFR')
     train_rep(model_nfr, 0.01, X, P, n_iter, 10, batch_size, alpha = alpha, C_reg=0, compute_emd=compute_emd, adv=True, verbose=True)
     results={}
 
-    print('begin testing.')
+    # print('begin testing.')
     X_ori_np = X.data.cpu().numpy()
     # Original.
     data_train, data_test = split_data_np((X.data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
-    print('logistic regresison on the original...')
+    # print('logistic regresison on the original...')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
     #print(lin_model.coef_.shape)
     #int(X_train.shape)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
-    print('logistic regresison evaluation...')
+    # print('logistic regresison evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
-    print('calculating emd...')
+    # print('calculating emd...')
     performance.append(emd_method(X_n, X_u))
-    print('calculating consistency...')
+    # print('calculating consistency...')
     performance.append(get_consistency(X.data.cpu().numpy(), lin_model, n_neighbors=k_nbrs))
-    print('calculating stat diff...')
+    # print('calculating stat diff...')
     performance.append(stat_diff(X.data.cpu().numpy(), P, lin_model))
     results['Original'] = performance
     # Original-P.
-    data_train, data_test = split_data_np((X[:, :-1].data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
+    data_train, data_test = split_data_np((X_unprot.data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
-    print('logistic regresison on the original-P')
+    # print('logistic regresison on the original-P')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
-    print('logistic regresison evaluation...')
+    # print('logistic regresison evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
-    print('calculating emd...')
-    performance.append(emd_method(X_n[:,:-1], X_u[:,:-1]))
-    print('calculating consistency...')
-    performance.append(get_consistency(X[:,:-1].data.cpu().numpy(), lin_model,  n_neighbors=k_nbrs))
-    print('calculating stat diff...')
-    performance.append(stat_diff(X[:,:-1].data.cpu().numpy(), P, lin_model))
+    # print('calculating emd...')
+    performance.append(emd_method(X_unprot[P==0], X_unprot[P==1]))
+    # print('calculating consistency...')
+    performance.append(get_consistency(X_unprot.data.cpu().numpy(), lin_model,  n_neighbors=k_nbrs))
+    # print('calculating stat diff...')
+    performance.append(stat_diff(X_unprot.data.cpu().numpy(), P, lin_model))
     results['Original-P'] = (performance)
     U_0 = model_ae.encoder(X[P==0]).data
     U_1 = model_ae.encoder(X[P==1]).data
     U = model_ae.encoder(X).data
-    print('ae emd afterwards: ' + str(emd_method(U_0, U_1)))
+    # print('ae emd afterwards: ' + str(emd_method(U_0, U_1)))
     U_np = U.cpu().numpy()
     data_train, data_test = split_data_np((U_np,P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
 
-    print('logistic regresison on AE...')
+    # print('logistic regresison on AE...')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
 
@@ -154,9 +155,9 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     results['AE'] = (performance)
 
 
-    U_0 = model_ae_P.encoder(X[:,:-1][P==0]).data
-    U_1 = model_ae_P.encoder(X[:,:-1][P==1]).data
-    U = model_ae_P.encoder(X[:,:-1]).data
+    U_0 = model_ae_P.encoder(X_unprot[P==0]).data
+    U_1 = model_ae_P.encoder(X_unprot[P==1]).data
+    U = model_ae_P.encoder(X_unprot).data
     print('ae-p emd afterwards: ' + str(emd_method(U_0, U_1)))
     U_np = U.cpu().numpy()
     data_train, data_test = split_data_np((U_np,P.data.cpu().numpy(),y), 0.7)
@@ -201,7 +202,6 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     print('calculating stat diff...')
     performance.append(stat_diff(X_test, P_test, lin_model))
     results['NFR'] = (performance)
-
     return results
 
 
@@ -212,29 +212,40 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
 # two batch of samples: one normal(0,1), and one uniform(0,1).
 with open('data/german.numeric.processed') as f:
     data_raw = np.array([list(map(float, x)) for x in map(lambda x: x.split(), f)])
+    print('raw data')
+    print(data_raw)
     data_raw = np.array(data_raw)
 np.random.shuffle(data_raw)
 P = data_raw[:, -2]
 y = data_raw[:, -1]
+print(y)
 X = data_raw[:, :-1]
+
+
 
 
 #parameter setting
 X = normalize(X, 150)
 
+# define which columns are unprotected
+X_unprot = X[:, :-1]
+
+# define which entries belong to each group
 X_u = X[P==1]
 X_n = X[P==0]
+Xu_up = X_unprot[P==1]
+Xn_up = X_unprot[P==0]
 print('original emd distance:')
 print(cal_emd_resamp(X_u, X_n, 50, 10))
 print('original emd distance without P:')
-print(cal_emd_resamp(X_u[:,:-1], X_n[:,:-1], 50, 10))
+print(cal_emd_resamp(Xu_up, Xn_up, 50, 10))
 print('original positive group distance without P:')
-print(cal_emd_resamp(X[:,:-1][(y==1) & (P==0)], X[:,:-1][(y==1) & (P==1)], 50, 10))
+print(cal_emd_resamp(X_unprot[(y==1) & (P==0)], X_unprot[(y==1) & (P==1)], 50, 10))
 print('original negative group distance without P:')
-print(cal_emd_resamp(X[:,:-1][(y==0) & (P==0)], X[:,:-1][(y==0) & (P==1)], 50, 10))
+print(cal_emd_resamp(X_unprot[(y==0) & (P==0)], X_unprot[(y==0) & (P==1)], 50, 10))
 
 X = torch.tensor(X).float()
-
+X_unprot = torch.tensor(X_unprot).float()
 # In[9]:
 
 
@@ -274,4 +285,3 @@ for k in range(n_test):
 print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs'])))
 for key, val in results.items():
     print('{0:40}: {1}'.format(key, ' '.join([str(np.round(x,3)) for x in val]).ljust(35)))
-
