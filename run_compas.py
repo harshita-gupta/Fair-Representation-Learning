@@ -1,10 +1,3 @@
-
-# coding: utf-8
-
-# In[1]:
-
-
-
 import torch
 import torch.nn as nzn
 import torch.optim as optim
@@ -66,21 +59,45 @@ def stat_diff(X, P, model):
 def shuffled_np(df):
     return np.random.shuffle(df.values)
 
+def get_model_preds(X_train, y_train, P_train, X_test, y_test, P_test, model_name):
+    lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
+    lin_model.fit(X_train, y_train)
+
+    y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
+    y_hats[model_name] = y_test_scores
+
+    print('logistic regresison evaluation...')
+    performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
+    return lin_model, y_test_scores, performance
+
+def get_preds_on_full_dataset(x_context, lin_model):
+    return sigmoid(((x_context.numpy()).dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
+
 def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3, emd_method=emd_samples):
-    global X, P, y, df
+    global X, P, y, df, X_test
 
     X_no_p = df.drop(['Y', 'P'], axis=1).values
+
+    # declare variables
+    X = torch.tensor(X).float()
+    P = torch.tensor(P).long()
+    # train-test split
+    data_train, data_test = split_data_np((X.data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
+    X_train, P_train, y_train = data_train
+    X_test, P_test, y_test = data_test
+    X_train_no_p = X_train[:, :-1]
+    X_test_no_p = X_test[:, :-1]
+    X_u = X[P==1]
+    X_n = X[P==0]
+
     # AE.
     model_ae = FairRep(len(X[0]), n_dim)
-    X = torch.tensor(X).float()
-    P = torch.tensor(P).long()
     train_rep(model_ae, 0.01, X, P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
+
     # AE_P.
     model_ae_P = FairRep(len(X[0])-1, n_dim-1)
-    model_ae_P
-    X = torch.tensor(X).float()
-    P = torch.tensor(P).long()
     train_rep(model_ae_P, 0.01,X_no_p , P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
+
     # NFR.
     model_nfr = FairRep(len(X[0]), n_dim)
     X = torch.tensor(X).float()
@@ -91,47 +108,35 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     print('begin testing.')
     X_ori_np = X.data.cpu().numpy()
     # Original.
-    data_train, data_test = split_data_np((X.data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
-    X_train, P_train, y_train = data_train
-    X_test, P_test, y_test = data_test
     print('logistic regresison on the original...')
-    lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
-    lin_model.fit(X_train, y_train)
-    #print(lin_model.coef_.shape)
-    #int(X_train.shape)
+    lin_model, y_test_scores, performance = get_model_preds(X_train, y_train, P_train, X_test, y_test, P_test, 'Original')
+    y_hats['Original'] = get_preds_on_full_dataset(X, lin_model)
 
-    y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
-    print('logistic regresison evaluation...')
-    performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
-    print('calculating emd...')
-    performance.append(emd_method(X_n, X_u))
-    print('calculating consistency...')
+    performance.append(emd_samples(X_n, X_u))
     performance.append(get_consistency(X.data.cpu().numpy(), lin_model, n_neighbors=k_nbrs))
-    print('calculating stat diff...')
     performance.append(stat_diff(X.data.cpu().numpy(), P, lin_model))
     results['Original'] = performance
-    # Original-P.
-    data_train, data_test = split_data_np((X[:, :-1].data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
-    X_train, P_train, y_train = data_train
-    X_test, P_test, y_test = data_test
-    print('logistic regresison on the original-P')
-    lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
-    lin_model.fit(X_train, y_train)
 
-    y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
-    print('logistic regresison evaluation...')
-    performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
-    print('calculating emd...')
+    # Original-P.
+    print('logistic regresison on the original-P')
+    lin_model, y_test_scores, performance = get_model_preds(X_train_no_p, y_train, P_train, X_test_no_p, y_test, P_test, 'Original-P')
+    y_hats['Original-P'] = get_preds_on_full_dataset(X[:, :-1], lin_model)
+
     performance.append(emd_method(X_n[:,:-1], X_u[:,:-1]))
     print('calculating consistency...')
     performance.append(get_consistency(X[:,:-1].data.cpu().numpy(), lin_model,  n_neighbors=k_nbrs))
     print('calculating stat diff...')
     performance.append(stat_diff(X[:,:-1].data.cpu().numpy(), P, lin_model))
-    results['Original-P'] = (performance)
+    results['Original-P'] = performance
+
+
+
+
+    # use encoder
     U_0 = model_ae.encoder(X[P==0]).data
     U_1 = model_ae.encoder(X[P==1]).data
     U = model_ae.encoder(X).data
-    print('ae emd afterwards: ' + str(emd_method(U_0, U_1)))
+
     U_np = U.cpu().numpy()
     data_train, data_test = split_data_np((U_np,P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
@@ -142,6 +147,8 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
+    y_hats['AE'] = get_preds_on_full_dataset(U, lin_model)
+
     print('logistic regresison evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
     print('calculating emd...')
@@ -152,6 +159,10 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     performance.append(stat_diff(X_test, P_test, lin_model))
     results['AE'] = (performance)
 
+
+
+
+    # AE minus P
 
     U_0 = model_ae_P.encoder(X[:,:-1][P==0]).data
     U_1 = model_ae_P.encoder(X[:,:-1][P==1]).data
@@ -167,6 +178,8 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
+    y_hats['AE_P'] = get_preds_on_full_dataset(U, lin_model)
+
     print('logistic regresison evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
     print('calculating emd...')
@@ -191,6 +204,8 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
+    y_hats['NFR'] = get_preds_on_full_dataset(U, lin_model)
+
     print('logistic regresison evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
     print('calculating emd...')
@@ -201,8 +216,18 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     performance.append(stat_diff(X_test, P_test, lin_model))
     results['NFR'] = (performance)
 
-    return results, y_test_scores
+    return results, y_hats
 
+def save_predictions(y, y_hat, model_name):
+    # make CSV dataframe to store predicted scores
+    y_hat = y_hat.reshape(len(X), 1)
+    y = y.reshape(len(X), 1)
+
+    data_yhat = np.concatenate((X, y, y_hat), axis=1)
+    cols = list(df.columns)
+    cols.append('y_hat')
+    pred_df = pd.DataFrame(data = data_yhat, columns = cols)
+    pred_df.to_csv('results/preds_' + model_name + '.csv')
 
 # two batch of samples: one normal(0,1), and one uniform(0,1).
 # with open('data/german.numeric.processed') as f:
@@ -217,6 +242,9 @@ try:
 except IOError as err:
     print('IO error')
 
+print('num COLs:')
+print(len(list(df.columns)))
+
 P = df['P'].values
 y = df['Y'].values
 
@@ -225,6 +253,9 @@ X = df.drop(['Y'], axis=1).values
 
 #parameter setting
 X = normalize(X, 150)
+
+print('X zero')
+print(X[0])
 
 X_u = X[P==1]
 X_n = X[P==0]
@@ -250,6 +281,7 @@ k_nbrs= 1
 
 n_test = 2
 results = {}
+y_hats = {}
 preds = {}
 for k in range(n_test):
     results_this, y_test_this = test_in_one(n_dim=n_dim,
@@ -265,16 +297,16 @@ for k in range(n_test):
         results = results_this
         for model in results:
             results[model] = np.array(results_this[model])/ n_test
-            preds[model] = y_test_this / n_test
+            preds[model] = y_test_this[model] / n_test
     else:
-        # take the average of all metrics + predictions so far
         for model in results:
             results[model] += np.array(results_this[model]) / n_test
-            preds[model] += y_test_this / n_test
+            preds[model] += y_test_this[model] / n_test
 
-# make CSV dataframe to store predicted scores
-pred_df = pd.DataFrame(data = preds[model], columns = ['y_pred'])
-pred_df.to_csv('new_pred.csv')
+for key, val in preds.items():
+    save_predictions(y, preds[key], key)
+
+
 # TODO combine with csv
 print('Predicted y saved to compas_y_pred.csv')
 print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs'])))
