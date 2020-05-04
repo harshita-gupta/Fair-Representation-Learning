@@ -229,7 +229,7 @@ def save_predictions(y, y_hat, reps, model_name):
     cols = list(df.columns)
     cols.append('y_hat')
     pred_df = pd.DataFrame(data = data_yhat, columns = cols)
-    pred_df.to_csv('results/preds_' + model_name + '.csv')
+    pred_df.to_csv('results/compas_preds_' + model_name + '.csv')
 
     if torch.is_tensor(reps):
         reps_np = reps.numpy()
@@ -240,7 +240,7 @@ def save_predictions(y, y_hat, reps, model_name):
             cols.append('repr_' + str(i))
         cols += ['y', 'y_hat']
         repr_df = pd.DataFrame(data = data_reps, columns = cols)
-        repr_df.to_csv('results/representation_' + model_name + '.csv')
+        repr_df.to_csv('results/compas_representation_' + model_name + '.csv')
 
 
 
