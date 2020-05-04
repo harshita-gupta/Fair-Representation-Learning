@@ -66,7 +66,7 @@ def get_model_preds(X_train, y_train, P_train, X_test, y_test, P_test, model_nam
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
     y_hats[model_name] = y_test_scores
 
-    print('logistic regresison evaluation...')
+    print('logistic regression evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
     return lin_model, y_test_scores, performance
 
@@ -108,7 +108,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     print('begin testing.')
     X_ori_np = X.data.cpu().numpy()
     # Original.
-    print('logistic regresison on the original...')
+    print('logistic regression on the original...')
     lin_model, y_test_scores, performance = get_model_preds(X_train, y_train, P_train, X_test, y_test, P_test, 'Original')
     y_hats['Original'] = get_preds_on_full_dataset(X, lin_model)
 
@@ -118,7 +118,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     results['Original'] = performance
 
     # Original-P.
-    print('logistic regresison on the original-P')
+    print('logistic regression on the original-P')
     lin_model, y_test_scores, performance = get_model_preds(X_train_no_p, y_train, P_train, X_test_no_p, y_test, P_test, 'Original-P')
     y_hats['Original-P'] = get_preds_on_full_dataset(X[:, :-1], lin_model)
 
@@ -142,23 +142,26 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
 
-    print('logistic regresison on AE...')
+    print('logistic regression on AE...')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
     y_hats['AE'] = get_preds_on_full_dataset(U, lin_model)
 
-    print('logistic regresison evaluation...')
-    performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
-    print('calculating emd...')
-    performance.append(emd_method(U_0, U_1))
-    print('calculating consistency...')
-    performance.append(get_consistency(U_np, lin_model, n_neighbors=k_nbrs, based_on=X_ori_np))
-    print('calculating stat diff...')
-    performance.append(stat_diff(X_test, P_test, lin_model))
-    results['AE'] = (performance)
+    def calc_perf(y_test, y_test_scores, P_test, U_0, U_1, U_np, lin_model, X_test):
+        print('logistic regression evaluation...')
+        performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
+        print('calculating emd...')
+        performance.append(emd_method(U_0, U_1))
+        print('calculating consistency...')
+        performance.append(get_consistency(U_np, lin_model, n_neighbors=k_nbrs, based_on=X_ori_np))
+        print('calculating stat diff...')
+        performance.append(stat_diff(X_test, P_test, lin_model))
+        return performance
 
+    performance = calc_perf(y_test, y_test_scores, P_test, U_0, U_1, U_np, lin_model, X_test)
+    results['AE'] = (performance)
 
 
 
@@ -173,21 +176,14 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
 
-    print('logistic regresison on AE-P...')
+    print('logistic regression on AE-P...')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
     y_hats['AE_P'] = get_preds_on_full_dataset(U, lin_model)
 
-    print('logistic regresison evaluation...')
-    performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
-    print('calculating emd...')
-    performance.append(emd_method(U_0, U_1))
-    print('calculating consistency...')
-    performance.append(get_consistency(U_np, lin_model,  n_neighbors=k_nbrs, based_on=X_ori_np))
-    print('calculating stat diff...')
-    performance.append(stat_diff(X_test, P_test, lin_model))
+    performance = calc_perf(y_test, y_test_scores, P_test, U_0, U_1, U_np, lin_model, X_test)
     results['AE_P'] = (performance)
 
     U_0 = model_nfr.encoder(X[P==0]).data
@@ -199,21 +195,14 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     data_train, data_test = split_data_np((U_np,P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
-    print('logistic regresison on NFR...')
+    print('logistic regression on NFR...')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
     y_hats['NFR'] = get_preds_on_full_dataset(U, lin_model)
 
-    print('logistic regresison evaluation...')
-    performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
-    print('calculating emd...')
-    performance.append(emd_method(U_0, U_1))
-    print('calculating consistency...')
-    performance.append(get_consistency(U_np, lin_model, n_neighbors=k_nbrs, based_on=X_ori_np))
-    print('calculating stat diff...')
-    performance.append(stat_diff(X_test, P_test, lin_model))
+    performance = calc_perf(y_test, y_test_scores, P_test, U_0, U_1, U_np, lin_model, X_test)
     results['NFR'] = (performance)
 
     return results, y_hats
@@ -312,4 +301,3 @@ print('Predicted y saved to compas_y_pred.csv')
 print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs'])))
 for key, val in results.items():
     print('{0:40}: {1}'.format(key, ' '.join([str(np.round(x,3)) for x in val]).ljust(35)))
-
