@@ -21,10 +21,6 @@ import pandas as pd
 
 np.random.seed(1)
 
-
-
-# In[2]:
-
 def shuffled_np(df):
     return np.random.shuffle(df.values)
 

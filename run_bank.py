@@ -9,6 +9,8 @@ from pyemd import emd_samples
 
 from model import FairRep
 from helpers_bank import update_progress, normalize, total_correlation, cal_emd_resamp
+from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid
+
 import time
 import sys
 from train import train_rep
@@ -23,38 +25,6 @@ np.random.seed(1)
 
 # os.environ['KMP_DUPLICATE_LIB_OK']='True'
 # In[2]:
-
-
-def split_data_np(data, ratio):
-    data_train = []
-    data_test = []
-    split = int(len(list(data)[0]) * ratio)
-    #print(list(data))
-    for d in data:
-        #print(d)
-        data_train.append(d[:split])
-        data_test.append(d[split+1:])
-    return data_train, data_test
-
-def sigmoid(X):
-    return 1 / (1+np.exp(-X))
-
-def get_consistency(X, classifier, n_neighbors, based_on=None):
-    nbr_model = NearestNeighbors(n_neighbors=n_neighbors+1, n_jobs=-1)
-    if based_on is None:
-        based_on = X
-    nbr_model.fit(based_on)
-    _, indices = nbr_model.kneighbors(based_on)
-    X_nbrs = X[indices[:, 1:]]
-    knn_mean_scores = np.mean(sigmoid(X_nbrs.dot(classifier.coef_.T) + classifier.intercept_), axis=1)
-    scores = sigmoid(X.dot(classifier.coef_.T) + classifier.intercept_)
-    mean_diff = np.mean(np.abs(scores - knn_mean_scores))
-    consistency = 1-mean_diff
-    return consistency
-
-def stat_diff(X, P, model):
-    scores = sigmoid(X.dot(model.coef_.T) + model.intercept_)
-    return np.abs(np.mean(scores[P==0]) - np.mean(scores[P==1]))
 
 def shuffled_np(df):
     return np.random.shuffle(df.values)
