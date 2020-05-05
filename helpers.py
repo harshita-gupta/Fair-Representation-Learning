@@ -5,6 +5,7 @@ import pandas as pd
 import copy
 import numpy as np
 from pyemd import emd_samples
+from sklearn.neighbors import NearestNeighbors
 
 
 def prettytime(seconds):
@@ -101,3 +102,67 @@ def cal_emd_resamp(A,B,n_samp,times):
         idx_b = np.random.choice(len(B), n_samp)
         emds.append(emd_samples(A[idx_a],B[idx_b], bins=2))
     return np.mean(emds)
+
+def split_data_np(data, ratio):
+    data_train = []
+    data_test = []
+    split = int(len(list(data)[0]) * ratio)
+    #print(list(data))
+    for d in data:
+        #print(d)
+        data_train.append(d[:split])
+        data_test.append(d[split+1:])
+    return data_train, data_test
+
+def sigmoid(X):
+    return 1 / (1+np.exp(-X))
+
+def get_consistency(X, classifier, n_neighbors, based_on=None):
+    nbr_model = NearestNeighbors(n_neighbors=n_neighbors+1, n_jobs=-1)
+    if based_on is None:
+        based_on = X
+    nbr_model.fit(based_on)
+    _, indices = nbr_model.kneighbors(based_on)
+    X_nbrs = X[indices[:, 1:]]
+    knn_mean_scores = np.mean(sigmoid(X_nbrs.dot(classifier.coef_.T) + classifier.intercept_), axis=1)
+    scores = sigmoid(X.dot(classifier.coef_.T) + classifier.intercept_)
+    mean_diff = np.mean(np.abs(scores - knn_mean_scores))
+    consistency = 1-mean_diff
+    return consistency
+
+def stat_diff(X, P, model):
+    scores = sigmoid(X.dot(model.coef_.T) + model.intercept_)
+    return np.abs(np.mean(scores[P==0]) - np.mean(scores[P==1]))
+
+def equal_odds(X, y, P, model):
+    scores = sigmoid(X.dot(model.coef_.T) + model.intercept_)
+    X_p = X[P == 1]
+    y_p = y[P == 1]
+    X_np = X[P == 0]
+    y_np = y[P == 0]
+
+    # given y = 1, find difference in predicted scores
+
+    i_p_pos = np.argwhere(y_p == 1)
+    X_p_pos = np.take(X_p, i_p_pos, axis=0)
+    scores_p = sigmoid(X_p_pos.dot(model.coef_.T) + model.intercept_)
+
+    i_np_pos = np.argwhere(y_np == 1)
+    X_np_pos = np.take(X_np, i_np_pos, axis=0)
+    scores_np = sigmoid(X_np_pos.dot(model.coef_.T) + model.intercept_)
+
+    diff_pos = np.abs(np.mean(scores_p) - np.mean(scores_np))
+
+    # given y = 0, find difference in predicted scores
+
+    i_p_neg = np.argwhere(y_p == 0)
+    X_p_neg = np.take(X_p, i_p_neg, axis=0)
+    scores_p = sigmoid(X_p_neg.dot(model.coef_.T) + model.intercept_)
+
+    i_np_neg = np.argwhere(y_np == 0)
+    X_np_neg = np.take(X_np, i_np_neg, axis=0)
+    scores_np = sigmoid(X_np_neg.dot(model.coef_.T) + model.intercept_)
+
+    diff_neg = np.abs(np.mean(scores_p) - np.mean(scores_np))
+
+    return diff_pos + diff_neg
