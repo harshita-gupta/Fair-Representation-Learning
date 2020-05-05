@@ -169,7 +169,7 @@ def make_cal_plot(X, y, P, model, model_name):
     plt.ylabel('True probability')
     plt.legend()
     plt.show(block=False)
-    plt.savefig(model_name + '.png')
+    plt.savefig('results/' + model_name + '.png')
     plt.clf()
 
 def stat_diff(X, P, model):

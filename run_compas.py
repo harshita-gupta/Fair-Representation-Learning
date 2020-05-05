@@ -102,6 +102,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     print('calculating stat diff...')
     performance.append(stat_diff(X[:,:-1].data.cpu().numpy(), P, lin_model))
     performance.append(equal_odds(X[:,:-1].data.cpu().numpy(), y, P, lin_model))
+    make_cal_plot(X[:,:-1].data.cpu().numpy(), y, P, lin_model, model_name)
 
     results[model_name] = performance
 
@@ -128,7 +129,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     y_hats[model_name] = get_preds_on_full_dataset(U, lin_model)
     reps[model_name] = U
 
-    def calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test):
+    def calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name):
         print('logistic regression evaluation...')
         performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
         print('calculating emd...')
@@ -139,9 +140,10 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
         performance.append(stat_diff(X_test, P_test, lin_model))
         print('calculating equal odds...')
         performance.append(equal_odds(X_test, y_test, P_test, lin_model))
+        make_cal_plot(X_test, y_test, P_test, lin_model, model_name)
         return performance
 
-    performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test)
+    performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name)
     results[model_name] = (performance)
 
 
@@ -166,7 +168,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     reps[model_name] = U
 
 
-    performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test)
+    performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name)
     results[model_name] = (performance)
 
     model_name = 'NFR'
@@ -187,7 +189,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     y_hats[model_name] = get_preds_on_full_dataset(U, lin_model)
     reps[model_name] = U
 
-    performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test)
+    performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name)
     results[model_name] = (performance)
 
     return results, y_hats, reps
