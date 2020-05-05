@@ -21,7 +21,7 @@ import pandas as pd
 np.random.seed(1)
 
 
-
+# os.environ['KMP_DUPLICATE_LIB_OK']='True'
 # In[2]:
 
 
@@ -60,7 +60,7 @@ def shuffled_np(df):
     return np.random.shuffle(df.values)
 
 def get_model_preds(X_train, y_train, P_train, X_test, y_test, P_test, model_name):
-    lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
+    lin_model = LogisticRegression(C=C, solver='sag', max_iter=3000)
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
@@ -76,7 +76,7 @@ def get_preds_on_full_dataset(x_context, lin_model):
 def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3, emd_method=emd_samples):
     global X, P, y, df, X_test
 
-    X_no_p = df.drop(['y', 'age_over_40', 'age'], axis=1).values
+    X_no_p = df.drop(['y', 'age_over_40'], axis=1).values
 
     # declare variables
     X = torch.tensor(X).float()
@@ -115,7 +115,8 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     y_hats['Original'] = get_preds_on_full_dataset(X, lin_model)
 
     print('calculating emd...')
-    performance.append(emd_samples(X_n, X_u))
+    performance.append(emd_method(X_n, X_u))
+    # performance.append(0)
     print('calculating consistency...')
     performance.append(get_consistency(X.data.cpu().numpy(), lin_model, n_neighbors=k_nbrs))
     print('calculating statistical difference...')
@@ -148,7 +149,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     X_test, P_test, y_test = data_test
 
     print('logistic regression on AE...')
-    lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
+    lin_model = LogisticRegression(C=C, solver='sag', max_iter=4000)
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
@@ -182,7 +183,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     X_test, P_test, y_test = data_test
 
     print('logistic regression on AE-P...')
-    lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
+    lin_model = LogisticRegression(C=C, solver='sag', max_iter=4000)
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
@@ -201,7 +202,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
     print('logistic regression on NFR...')
-    lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
+    lin_model = LogisticRegression(C=C, solver='sag', max_iter=4000)
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
@@ -239,13 +240,13 @@ except IOError as err:
 print('num COLs:')
 print(len(list(df.columns)))
 
-# df = df.sample(20000)
 P = df['age_over_40'].values
 y = df['y'].values
+df = df.drop(['age'], axis=1)
 
 print(df.shape)
 # X contains protected class P
-X = df.drop(['y', 'age'], axis=1).values
+X = df.drop(['y'], axis=1).values
 
 
 
@@ -257,8 +258,6 @@ print(X[0])
 
 X_u = X[P==1]
 X_n = X[P==0]
-
-print (type(X_u))
 
 print('original emd distance:')
 print(cal_emd_resamp(X_u, X_n, 100, 10))
@@ -304,7 +303,10 @@ for k in range(n_test):
             preds[model] += y_test_this[model] / n_test
 
 for key, val in preds.items():
-    save_predictions(y, preds[key], key)
+    try:
+        save_predictions(y, preds[key], key)
+    except:
+        print("could not save this model:", key)
 
 
 # TODO combine with csv

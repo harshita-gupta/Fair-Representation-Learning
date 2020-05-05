@@ -99,5 +99,5 @@ def cal_emd_resamp(A,B,n_samp,times):
     for t in range(times):
         idx_a = np.random.choice(len(A), n_samp)
         idx_b = np.random.choice(len(B), n_samp)
-        emds.append(emd_samples(A[idx_a],B[idx_b], bins=20))
+        emds.append(emd_samples(A[idx_a],B[idx_b], bins=10))
     return np.mean(emds)
