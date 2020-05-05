@@ -9,7 +9,7 @@ from pyemd import emd_samples
 
 from model import FairRep
 from helpers import update_progress, normalize, total_correlation, cal_emd_resamp
-from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid, make_cal_plot
+from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid, make_cal_plot, save_predictions
 import time
 import sys
 from train import train_rep
@@ -66,7 +66,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     train_rep(model_ae_P, 0.01,X_no_p , P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
 
     # NFR.
-    model_name = 'Original'
+    model_name = 'compas_Original'
     model_nfr = FairRep(len(X[0]), n_dim)
     X = torch.tensor(X).float()
     P = torch.tensor(P).long()
@@ -90,7 +90,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     results[model_name] = performance
 
     # Original-P.
-    model_name = 'Original-P'
+    model_name = 'compas_Original-P'
     print('logistic regression on the original-P')
     lin_model, y_test_scores, performance = get_model_preds(X_train_no_p, y_train, P_train, X_test_no_p, y_test, P_test, model_name)
     y_hats[model_name] = get_preds_on_full_dataset(X[:, :-1], lin_model)
@@ -110,7 +110,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
 
 
     # use encoder
-    model_name = 'AE'
+    model_name = 'compas_AE'
 
     U_0 = model_ae.encoder(X[P==0]).data
     U_1 = model_ae.encoder(X[P==1]).data
@@ -149,7 +149,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
 
 
     # AE minus P
-    model_name = 'AE_P'
+    model_name = 'compas_AE_P'
     U_0 = model_ae_P.encoder(X[:,:-1][P==0]).data
     U_1 = model_ae_P.encoder(X[:,:-1][P==1]).data
     U = model_ae_P.encoder(X[:,:-1]).data
@@ -171,7 +171,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name)
     results[model_name] = (performance)
 
-    model_name = 'NFR'
+    model_name = 'compas_NFR'
     U_0 = model_nfr.encoder(X[P==0]).data
     U_1 = model_nfr.encoder(X[P==1]).data
     U = model_nfr.encoder(X).data
@@ -193,28 +193,6 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     results[model_name] = (performance)
 
     return results, y_hats, reps
-
-def save_predictions(y, y_hat, reps, model_name):
-    # make CSV dataframe to store predicted scores
-    y_hat = y_hat.reshape(len(X), 1)
-    y = y.reshape(len(X), 1)
-
-    data_yhat = np.concatenate((X, y, y_hat), axis=1)
-    cols = list(df.columns)
-    cols.append('y_hat')
-    pred_df = pd.DataFrame(data = data_yhat, columns = cols)
-    pred_df.to_csv('results/compas_preds_' + model_name + '.csv')
-
-    if torch.is_tensor(reps):
-        reps_np = reps.numpy()
-        data_reps = np.concatenate((reps_np, y, y_hat), axis=1)
-        num_cols = reps_np.shape[1]
-        cols = []
-        for i in range(num_cols):
-            cols.append('repr_' + str(i))
-        cols += ['y', 'y_hat']
-        repr_df = pd.DataFrame(data = data_reps, columns = cols)
-        repr_df.to_csv('results/compas_representation_' + model_name + '.csv')
 
 
 
@@ -303,7 +281,7 @@ for k in range(n_test):
                 reps[model] = None
 
 for key, val in preds.items():
-    save_predictions(y, preds[key], reps[key], key)
+    save_predictions(df, X, y, preds[key], reps[key], key)
 
 
 # TODO combine with csv

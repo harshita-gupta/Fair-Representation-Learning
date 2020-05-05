@@ -9,7 +9,7 @@ from pyemd import emd_samples
 
 from model import FairRep
 from helpers_bank import update_progress, normalize, total_correlation, cal_emd_resamp
-from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid
+from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid, make_cal_plot, save_predictions
 
 import time
 import sys
@@ -21,10 +21,6 @@ from dumb_containers import split_data, evaluate_performance_sim
 import pandas as pd
 
 np.random.seed(1)
-
-
-# os.environ['KMP_DUPLICATE_LIB_OK']='True'
-# In[2]:
 
 def shuffled_np(df):
     return np.random.shuffle(df.values)
@@ -60,17 +56,17 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     X_u = X[P==1]
     X_n = X[P==0]
 
+
     # AE.
     model_ae = FairRep(len(X[0]), n_dim)
     train_rep(model_ae, 0.01, X, P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
 
     # AE_P.
     model_ae_P = FairRep(len(X[0])-1, n_dim-1)
-    print(len(X[0])-1)
-    print(X_no_p.shape)
-    train_rep(model_ae_P, 0.01, X_no_p , P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
+    train_rep(model_ae_P, 0.01,X_no_p , P, n_iter, 10, batch_size, alpha = 0, C_reg=0, compute_emd=compute_emd, adv=False, verbose=True)
 
     # NFR.
+    model_name = 'bank_Original'
     model_nfr = FairRep(len(X[0]), n_dim)
     X = torch.tensor(X).float()
     P = torch.tensor(P).long()
@@ -81,34 +77,41 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     X_ori_np = X.data.cpu().numpy()
     # Original.
     print('logistic regression on the original...')
-    lin_model, y_test_scores, performance = get_model_preds(X_train, y_train, P_train, X_test, y_test, P_test, 'Original')
-    y_hats['Original'] = get_preds_on_full_dataset(X, lin_model)
+    lin_model, y_test_scores, performance = get_model_preds(X_train, y_train, P_train, X_test, y_test, P_test, model_name)
+    y_hats[model_name] = get_preds_on_full_dataset(X, lin_model)
+    reps[model_name] = None
 
-    print('calculating emd...')
     performance.append(emd_method(X_n, X_u))
-    # performance.append(0)
-    print('calculating consistency...')
     performance.append(get_consistency(X.data.cpu().numpy(), lin_model, n_neighbors=k_nbrs))
-    print('calculating statistical difference...')
     performance.append(stat_diff(X.data.cpu().numpy(), P, lin_model))
-    results['Original'] = performance
+    performance.append(equal_odds(X.data.cpu().numpy(), y, P, lin_model))
+    make_cal_plot(X.data.cpu().numpy(), y, P, lin_model, model_name)
+
+    results[model_name] = performance
 
     # Original-P.
+    model_name = 'bank_Original-P'
     print('logistic regression on the original-P')
-    lin_model, y_test_scores, performance = get_model_preds(X_train_no_p, y_train, P_train, X_test_no_p, y_test, P_test, 'Original-P')
-    y_hats['Original-P'] = get_preds_on_full_dataset(X[:, :-1], lin_model)
+    lin_model, y_test_scores, performance = get_model_preds(X_train_no_p, y_train, P_train, X_test_no_p, y_test, P_test, model_name)
+    y_hats[model_name] = get_preds_on_full_dataset(X[:, :-1], lin_model)
+    reps[model_name] = None
 
     performance.append(emd_method(X_n[:,:-1], X_u[:,:-1]))
     print('calculating consistency...')
     performance.append(get_consistency(X[:,:-1].data.cpu().numpy(), lin_model,  n_neighbors=k_nbrs))
     print('calculating stat diff...')
     performance.append(stat_diff(X[:,:-1].data.cpu().numpy(), P, lin_model))
-    results['Original-P'] = performance
+    performance.append(equal_odds(X[:,:-1].data.cpu().numpy(), y, P, lin_model))
+    make_cal_plot(X[:,:-1].data.cpu().numpy(), y, P, lin_model, model_name)
+
+    results[model_name] = performance
 
 
 
 
     # use encoder
+    model_name = 'bank_AE'
+
     U_0 = model_ae.encoder(X[P==0]).data
     U_1 = model_ae.encoder(X[P==1]).data
     U = model_ae.encoder(X).data
@@ -119,13 +122,14 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     X_test, P_test, y_test = data_test
 
     print('logistic regression on AE...')
-    lin_model = LogisticRegression(C=C, solver='sag', max_iter=4000)
+    lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
-    y_hats['AE'] = get_preds_on_full_dataset(U, lin_model)
+    y_hats[model_name] = get_preds_on_full_dataset(U, lin_model)
+    reps[model_name] = U
 
-    def calc_perf(y_test, y_test_scores, P_test, U_0, U_1, U_np, lin_model, X_test):
+    def calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name):
         print('logistic regression evaluation...')
         performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
         print('calculating emd...')
@@ -134,15 +138,18 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
         performance.append(get_consistency(U_np, lin_model, n_neighbors=k_nbrs, based_on=X_ori_np))
         print('calculating stat diff...')
         performance.append(stat_diff(X_test, P_test, lin_model))
+        print('calculating equal odds...')
+        performance.append(equal_odds(X_test, y_test, P_test, lin_model))
+        make_cal_plot(X_test, y_test, P_test, lin_model, model_name)
         return performance
 
-    performance = calc_perf(y_test, y_test_scores, P_test, U_0, U_1, U_np, lin_model, X_test)
-    results['AE'] = (performance)
+    performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name)
+    results[model_name] = (performance)
 
 
 
     # AE minus P
-
+    model_name = 'bank_AE_P'
     U_0 = model_ae_P.encoder(X[:,:-1][P==0]).data
     U_1 = model_ae_P.encoder(X[:,:-1][P==1]).data
     U = model_ae_P.encoder(X[:,:-1]).data
@@ -153,15 +160,18 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     X_test, P_test, y_test = data_test
 
     print('logistic regression on AE-P...')
-    lin_model = LogisticRegression(C=C, solver='sag', max_iter=4000)
+    lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
-    y_hats['AE_P'] = get_preds_on_full_dataset(U, lin_model)
+    y_hats[model_name] = get_preds_on_full_dataset(U, lin_model)
+    reps[model_name] = U
 
-    performance = calc_perf(y_test, y_test_scores, P_test, U_0, U_1, U_np, lin_model, X_test)
-    results['AE_P'] = (performance)
 
+    performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name)
+    results[model_name] = (performance)
+
+    model_name = 'bank_NFR'
     U_0 = model_nfr.encoder(X[P==0]).data
     U_1 = model_nfr.encoder(X[P==1]).data
     U = model_nfr.encoder(X).data
@@ -172,27 +182,17 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
     print('logistic regression on NFR...')
-    lin_model = LogisticRegression(C=C, solver='sag', max_iter=4000)
+    lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
 
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
-    y_hats['NFR'] = get_preds_on_full_dataset(U, lin_model)
+    y_hats[model_name] = get_preds_on_full_dataset(U, lin_model)
+    reps[model_name] = U
 
-    performance = calc_perf(y_test, y_test_scores, P_test, U_0, U_1, U_np, lin_model, X_test)
-    results['NFR'] = (performance)
+    performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name)
+    results[model_name] = (performance)
 
-    return results, y_hats
-
-def save_predictions(y, y_hat, model_name):
-    # make CSV dataframe to store predicted scores
-    y_hat = y_hat.reshape(len(X), 1)
-    y = y.reshape(len(X), 1)
-
-    data_yhat = np.concatenate((X, y, y_hat), axis=1)
-    cols = list(df.columns)
-    cols.append('y_hat')
-    pred_df = pd.DataFrame(data = data_yhat, columns = cols)
-    pred_df.to_csv('results/bank_preds_' + model_name + '.csv')
+    return results, y_hats, reps
 
 # two batch of samples: one normal(0,1), and one uniform(0,1).
 # with open('data/german.numeric.processed') as f:
@@ -248,12 +248,14 @@ C=0.1
 alpha = 1000
 k_nbrs= 1
 
-n_test = 2
+n_test = 1
 results = {}
 y_hats = {}
+
 preds = {}
+reps = {}
 for k in range(n_test):
-    results_this, y_test_this = test_in_one(n_dim=n_dim,
+    results_this, y_test_this, reps_this = test_in_one(n_dim=n_dim,
                      batch_size=batch_size,
                      n_iter=n_iter,
                      C=C,
@@ -267,20 +269,27 @@ for k in range(n_test):
         for model in results:
             results[model] = np.array(results_this[model])/ n_test
             preds[model] = y_test_this[model] / n_test
+            if torch.is_tensor(reps_this[model]):
+                reps[model] = reps_this[model] / n_test
+            else:
+                reps[model] = None
     else:
         for model in results:
             results[model] += np.array(results_this[model]) / n_test
             preds[model] += y_test_this[model] / n_test
+            if torch.is_tensor(reps_this[model]):
+                reps[model] += reps_this[model] / n_test
+            else:
+                reps[model] = None
 
 for key, val in preds.items():
-    try:
-        save_predictions(y, preds[key], key)
-    except:
-        print("could not save this model:", key)
+    save_predictions(df, X, y, preds[key], reps[key], key)
 
 
 # TODO combine with csv
-print('Predicted y saved to compas_y_pred.csv')
-print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs'])))
+print('Predictions saved.')
+print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs', 'eq_odds'])))
 for key, val in results.items():
     print('{0:40}: {1}'.format(key, ' '.join([str(np.round(x,3)) for x in val]).ljust(35)))
+
+print('Complete.')

@@ -8,6 +8,7 @@ from pyemd import emd_samples
 from sklearn.neighbors import NearestNeighbors
 from sklearn.calibration import calibration_curve
 import matplotlib.pyplot as plt
+import torch
 
 def prettytime(seconds):
     return seconds/3600, seconds/60%60, seconds%60
@@ -207,3 +208,25 @@ def equal_odds(X, y, P, model):
     diff_neg = np.abs(np.mean(scores_p) - np.mean(scores_np))
 
     return diff_pos + diff_neg
+
+def save_predictions(df, X, y, y_hat, reps, model_name):
+    # make CSV dataframe to store predicted scores
+    y_hat = y_hat.reshape(len(X), 1)
+    y = y.reshape(len(X), 1)
+
+    data_yhat = np.concatenate((X, y, y_hat), axis=1)
+    cols = list(df.columns)
+    cols.append('y_hat')
+    pred_df = pd.DataFrame(data = data_yhat, columns = cols)
+    pred_df.to_csv('results/preds_' + model_name + '.csv')
+
+    if torch.is_tensor(reps):
+        reps_np = reps.numpy()
+        data_reps = np.concatenate((reps_np, y, y_hat), axis=1)
+        num_cols = reps_np.shape[1]
+        cols = []
+        for i in range(num_cols):
+            cols.append('repr_' + str(i))
+        cols += ['y', 'y_hat']
+        repr_df = pd.DataFrame(data = data_reps, columns = cols)
+        repr_df.to_csv('results/representation_' + model_name + '.csv')
