@@ -9,7 +9,7 @@ from pyemd import emd_samples
 
 from model import FairRep
 from helpers import update_progress, normalize, total_correlation, cal_emd_resamp
-from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid
+from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid, make_cal_plot
 import time
 import sys
 from train import train_rep
@@ -85,6 +85,8 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     performance.append(get_consistency(X.data.cpu().numpy(), lin_model, n_neighbors=k_nbrs))
     performance.append(stat_diff(X.data.cpu().numpy(), P, lin_model))
     performance.append(equal_odds(X.data.cpu().numpy(), y, P, lin_model))
+    make_cal_plot(X.data.cpu().numpy(), y, P, lin_model, model_name)
+
     results[model_name] = performance
 
     # Original-P.

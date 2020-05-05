@@ -6,6 +6,8 @@ import copy
 import numpy as np
 from pyemd import emd_samples
 from sklearn.neighbors import NearestNeighbors
+from sklearn.calibration import calibration_curve
+import matplotlib.pyplot as plt
 
 def prettytime(seconds):
     return seconds/3600, seconds/60%60, seconds%60
@@ -128,6 +130,47 @@ def get_consistency(X, classifier, n_neighbors, based_on=None):
     mean_diff = np.mean(np.abs(scores - knn_mean_scores))
     consistency = 1-mean_diff
     return consistency
+
+
+def make_cal_plot(X, y, P, model, model_name):
+    """
+    Saves a calibration plot for the given model.
+    See https://scikit-learn.org/stable/modules/generated/sklearn.calibration.calibration_curve.html
+
+    Parameters:
+    X: features used to make predictions for model.
+    y: true labels.
+    P: indicator for protected class membership.
+    model: trained LogisticRegression model.
+    model_name: name of model.
+
+    Returns:
+    Saves plot to 'results/model_name.png'.
+    """
+    scores = sigmoid(X.dot(model.coef_.T) + model.intercept_)
+    fop, mpv = calibration_curve(y, scores, n_bins=10, normalize=True)
+    # plot perfectly calibrated
+    plt.plot([0, 1], [0, 1], linestyle='--', label='Baseline')
+    # plot model reliability
+    plt.plot(list(mpv), list(fop), marker='.', label='All data')
+
+    # protected class
+    scores_p = scores[P == 1]
+    y_p = y[P == 1]
+    scores_np = scores[P == 0]
+    y_np = y[P == 0]
+    fop, mpv = calibration_curve(y_p, scores_p, n_bins=10, normalize=True)
+    plt.plot(list(mpv), list(fop), marker=',', label='P = 1')
+
+    fop, mpv = calibration_curve(y_np, scores_np, n_bins=10, normalize=True)
+    plt.plot(list(mpv), list(fop), marker='1', label='P = 0')
+    plt.title(model_name + ' calibration plot')
+    plt.xlabel('Predicted probability')
+    plt.ylabel('True probability')
+    plt.legend()
+    plt.show(block=False)
+    plt.savefig(model_name + '.png')
+    plt.clf()
 
 def stat_diff(X, P, model):
     scores = sigmoid(X.dot(model.coef_.T) + model.intercept_)
