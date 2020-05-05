@@ -7,7 +7,6 @@ import numpy as np
 from pyemd import emd_samples
 from sklearn.neighbors import NearestNeighbors
 
-
 def prettytime(seconds):
     return seconds/3600, seconds/60%60, seconds%60
 
@@ -135,7 +134,6 @@ def stat_diff(X, P, model):
     return np.abs(np.mean(scores[P==0]) - np.mean(scores[P==1]))
 
 def equal_odds(X, y, P, model):
-    scores = sigmoid(X.dot(model.coef_.T) + model.intercept_)
     X_p = X[P == 1]
     y_p = y[P == 1]
     X_np = X[P == 0]

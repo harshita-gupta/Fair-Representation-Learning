@@ -84,6 +84,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     performance.append(emd_method(X_n, X_u))
     performance.append(get_consistency(X.data.cpu().numpy(), lin_model, n_neighbors=k_nbrs))
     performance.append(stat_diff(X.data.cpu().numpy(), P, lin_model))
+    performance.append(equal_odds(X.data.cpu().numpy(), y, P, lin_model))
     results[model_name] = performance
 
     # Original-P.
@@ -98,6 +99,8 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     performance.append(get_consistency(X[:,:-1].data.cpu().numpy(), lin_model,  n_neighbors=k_nbrs))
     print('calculating stat diff...')
     performance.append(stat_diff(X[:,:-1].data.cpu().numpy(), P, lin_model))
+    performance.append(equal_odds(X[:,:-1].data.cpu().numpy(), y, P, lin_model))
+
     results[model_name] = performance
 
 
@@ -123,7 +126,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     y_hats[model_name] = get_preds_on_full_dataset(U, lin_model)
     reps[model_name] = U
 
-    def calc_perf(y_test, y_test_scores, P_test, U_0, U_1, U_np, lin_model, X_test):
+    def calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test):
         print('logistic regression evaluation...')
         performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
         print('calculating emd...')
@@ -132,9 +135,11 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
         performance.append(get_consistency(U_np, lin_model, n_neighbors=k_nbrs, based_on=X_ori_np))
         print('calculating stat diff...')
         performance.append(stat_diff(X_test, P_test, lin_model))
+        print('calculating equal odds...')
+        performance.append(equal_odds(X_test, y_test, P_test, lin_model))
         return performance
 
-    performance = calc_perf(y_test, y_test_scores, P_test, U_0, U_1, U_np, lin_model, X_test)
+    performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test)
     results[model_name] = (performance)
 
 
@@ -159,7 +164,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     reps[model_name] = U
 
 
-    performance = calc_perf(y_test, y_test_scores, P_test, U_0, U_1, U_np, lin_model, X_test)
+    performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test)
     results[model_name] = (performance)
 
     model_name = 'NFR'
@@ -180,7 +185,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     y_hats[model_name] = get_preds_on_full_dataset(U, lin_model)
     reps[model_name] = U
 
-    performance = calc_perf(y_test, y_test_scores, P_test, U_0, U_1, U_np, lin_model, X_test)
+    performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test)
     results[model_name] = (performance)
 
     return results, y_hats, reps
@@ -298,7 +303,9 @@ for key, val in preds.items():
 
 
 # TODO combine with csv
-print('Predicted y saved to compas_y_pred.csv')
-print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs'])))
+print('Predictions saved.')
+print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs', 'eq_odds'])))
 for key, val in results.items():
     print('{0:40}: {1}'.format(key, ' '.join([str(np.round(x,3)) for x in val]).ljust(35)))
+
+print('Complete.')
