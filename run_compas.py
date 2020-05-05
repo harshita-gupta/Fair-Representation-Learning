@@ -116,7 +116,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     y_hats[model_name] = get_preds_on_full_dataset(X, lin_model)
     reps[model_name] = None
 
-    performance.append(emd_samples(X_n, X_u))
+    performance.append(emd_method(X_n, X_u))
     performance.append(get_consistency(X.data.cpu().numpy(), lin_model, n_neighbors=k_nbrs))
     performance.append(stat_diff(X.data.cpu().numpy(), P, lin_model))
     results[model_name] = performance
