@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 
 import pandas as pd
 
-run_alpha_cv = True
+run_alpha_cv = False
 
 np.random.seed(1)
 
@@ -269,11 +269,11 @@ print(cal_emd_resamp(X[:,:-1][(y==0) & (P==0)], X[:,:-1][(y==0) & (P==1)], 50, 1
 
 X = torch.tensor(X).float()
 
-n_dim = 30
+n_dim = 40
 batch_size = 2000
 n_iter = 20
 C=0.1
-alpha = 1000
+alpha = 10**8
 k_nbrs= 1
 
 n_test = 1
