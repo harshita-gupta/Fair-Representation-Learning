@@ -281,6 +281,7 @@ preds = {}
 reps = {}
 
 if run_alpha_cv:
+    # cross-validation on alpha
     alph_results = []
     for alph in [10, 10**2, 10**3, 10**4, 10**6, 10**8]:
         mse, wdist = run_nfr_cv(n_dim=n_dim, batch_size=batch_size, C=1., alpha=alph, emd_method = emd_samples)
@@ -288,6 +289,19 @@ if run_alpha_cv:
     alph_df = pd.DataFrame(alph_results)
     alph_df.to_csv('compas_alpha_cv.csv')
     print('saved, exiting')
+
+    # cross-validation on n_dim
+    dim_results = []
+    dim_range = np.linspace(1, len(X[0]), 10)
+    for dim in dim_range:
+        d_i = int(dim)
+        mse, wdist = run_nfr_cv(n_dim=d_i, batch_size=batch_size, C=1., alpha=alpha, emd_method = emd_samples)
+        dim_results.append({'n_dim': d_i, 'mse': mse.detach().numpy(), 'wdist': wdist.detach().numpy()})
+    dim_df = pd.DataFrame(dim_results)
+    dim_df.to_csv('compas_dim_cv.csv')
+    print('saved, exiting')
+
+
 
 
 else:
