@@ -48,7 +48,6 @@ def train_rep(model, lr, X, P, n_iter, c_iter, batch_size,
 
     l1_crit = nn.L1Loss(size_average=False)
     n_of_batch = int(len(X) / (batch_size * 2)) * n_iter
-    print('vectors')
     for i in range(n_of_batch):
         #X_n = X_0[np.random.choice(len(X_0), batch_size)]
         #X_u = X_1[np.random.choice(len(X_1), batch_size)]
@@ -65,6 +64,7 @@ def train_rep(model, lr, X, P, n_iter, c_iter, batch_size,
                 for t in range(c_iter):
                     optim_crit.zero_grad()
                     w_dist = model.wdist(X_n, X_u)
+                    print('Wasserstein distance is NOW: ' + str(w_dist))
                     loss = -w_dist
                     loss.backward(retain_graph=True)
                     optim_crit.step()
