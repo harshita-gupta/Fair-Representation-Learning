@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from math import log10
 
-run_alpha_cv = True
+run_alpha_cv = False
 
 np.random.seed(1)
 
@@ -230,7 +230,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     # print('raw data')
     # print(data_raw)
     # data_raw = np.array(data_raw)
-filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'compas_clean.csv')
+filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'compas_new.csv')
 #filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'german_clean.csv')
 try:
     df = pd.read_csv(filepath)
