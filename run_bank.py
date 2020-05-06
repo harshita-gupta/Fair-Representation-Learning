@@ -20,6 +20,8 @@ from dumb_containers import split_data, evaluate_performance_sim
 
 import pandas as pd
 
+run_alpha_cv = False
+
 np.random.seed(1)
 
 def shuffled_np(df):
@@ -254,6 +256,7 @@ y_hats = {}
 
 preds = {}
 reps = {}
+
 for k in range(n_test):
     results_this, y_test_this, reps_this = test_in_one(n_dim=n_dim,
                      batch_size=batch_size,

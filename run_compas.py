@@ -19,6 +19,8 @@ from dumb_containers import split_data, evaluate_performance_sim
 
 import pandas as pd
 
+run_alpha_cv = True
+
 np.random.seed(1)
 
 def shuffled_np(df):
@@ -37,6 +39,31 @@ def get_model_preds(X_train, y_train, P_train, X_test, y_test, P_test, model_nam
 
 def get_preds_on_full_dataset(x_context, lin_model):
     return sigmoid(((x_context.numpy()).dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
+
+def run_nfr_cv(n_dim, batch_size, C, alpha, emd_method = emd_samples):
+    global X, P, y, df, X_test
+
+    reps = {}
+
+    X_no_p = df.drop(['Y', 'P'], axis=1).values
+
+    # declare variables
+    X = torch.tensor(X).float()
+    P = torch.tensor(P).long()
+    # train-test split
+    data_train, data_test = split_data_np((X.data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
+    X_train, P_train, y_train = data_train
+    X_test, P_test, y_test = data_test
+    X_train_no_p = X_train[:, :-1]
+    X_test_no_p = X_test[:, :-1]
+    X_u = X[P==1]
+    X_n = X[P==0]
+
+    # NFR.
+    model_nfr = FairRep(len(X[0]), n_dim)
+    X = torch.tensor(X).float()
+    P = torch.tensor(P).long()
+    return train_rep(model_nfr, 0.01, X, P, n_iter, c_iter=10, batch_size=batch_size, alpha = alpha, C_reg=C)
 
 def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3, emd_method=emd_samples):
     global X, P, y, df, X_test
@@ -252,42 +279,54 @@ y_hats = {}
 
 preds = {}
 reps = {}
-for k in range(n_test):
-    results_this, y_test_this, reps_this = test_in_one(n_dim=n_dim,
-                     batch_size=batch_size,
-                     n_iter=n_iter,
-                     C=C,
-                     alpha=alpha,
-                    compute_emd=False,
-                    k_nbrs=k_nbrs,
-                    emd_method=lambda x,y: cal_emd_resamp(x, y, 50, 10))
 
-    if k == 0:
-        results = results_this
-        for model in results:
-            results[model] = np.array(results_this[model])/ n_test
-            preds[model] = y_test_this[model] / n_test
-            if torch.is_tensor(reps_this[model]):
-                reps[model] = reps_this[model] / n_test
-            else:
-                reps[model] = None
-    else:
-        for model in results:
-            results[model] += np.array(results_this[model]) / n_test
-            preds[model] += y_test_this[model] / n_test
-            if torch.is_tensor(reps_this[model]):
-                reps[model] += reps_this[model] / n_test
-            else:
-                reps[model] = None
-
-for key, val in preds.items():
-    save_predictions(df, X, y, preds[key], reps[key], key)
+if run_alpha_cv:
+    alph_results = []
+    for alph in [10, 10**2, 10**3, 10**4, 10**6, 10**8]:
+        mse, wdist = run_nfr_cv(n_dim=n_dim, batch_size=batch_size, C=1., alpha=alph, emd_method = emd_samples)
+        alph_results.append({'alpha': alph, 'mse': mse.detach().numpy(), 'wdist': wdist.detach().numpy()})
+    alph_df = pd.DataFrame(alph_results)
+    alph_df.to_csv('compas_alpha_cv.csv')
+    print('saved, exiting')
 
 
-# TODO combine with csv
-print('Predictions saved.')
-print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs', 'eq_odds'])))
-for key, val in results.items():
-    print('{0:40}: {1}'.format(key, ' '.join([str(np.round(x,3)) for x in val]).ljust(35)))
+else:
+    for k in range(n_test):
+        results_this, y_test_this, reps_this = test_in_one(n_dim=n_dim,
+                         batch_size=batch_size,
+                         n_iter=n_iter,
+                         C=C,
+                         alpha=alpha,
+                        compute_emd=False,
+                        k_nbrs=k_nbrs,
+                        emd_method=lambda x,y: cal_emd_resamp(x, y, 50, 10))
 
-print('Complete.')
+        if k == 0:
+            results = results_this
+            for model in results:
+                results[model] = np.array(results_this[model])/ n_test
+                preds[model] = y_test_this[model] / n_test
+                if torch.is_tensor(reps_this[model]):
+                    reps[model] = reps_this[model] / n_test
+                else:
+                    reps[model] = None
+        else:
+            for model in results:
+                results[model] += np.array(results_this[model]) / n_test
+                preds[model] += y_test_this[model] / n_test
+                if torch.is_tensor(reps_this[model]):
+                    reps[model] += reps_this[model] / n_test
+                else:
+                    reps[model] = None
+
+    for key, val in preds.items():
+        save_predictions(df, X, y, preds[key], reps[key], key)
+
+
+    # TODO combine with csv
+    print('Predictions saved.')
+    print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs', 'eq_odds'])))
+    for key, val in results.items():
+        print('{0:40}: {1}'.format(key, ' '.join([str(np.round(x,3)) for x in val]).ljust(35)))
+
+    print('Complete.')
