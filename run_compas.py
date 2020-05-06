@@ -16,8 +16,9 @@ from train import train_rep
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import NearestNeighbors
 from dumb_containers import split_data, evaluate_performance_sim
-
+import matplotlib.pyplot as plt
 import pandas as pd
+from math import log10
 
 run_alpha_cv = True
 
@@ -281,14 +282,34 @@ preds = {}
 reps = {}
 
 if run_alpha_cv:
+    dataset = 'compas'
     # cross-validation on alpha
     alph_results = []
-    for alph in [10, 10**2, 10**3, 10**4, 10**6, 10**8]:
+    for alph in [10**2, 10**3, 10**4, 10**6, 10**8, 10**10]:
         mse, wdist = run_nfr_cv(n_dim=n_dim, batch_size=batch_size, C=1., alpha=alph, emd_method = emd_samples)
         alph_results.append({'alpha': alph, 'mse': mse.detach().numpy(), 'wdist': wdist.detach().numpy()})
     alph_df = pd.DataFrame(alph_results)
-    alph_df.to_csv('compas_alpha_cv.csv')
+    alph_df.to_csv('results/' + dataset + 'alpha_cv.csv')
     print('saved, exiting')
+
+    # make plot
+    plt.plot(np.log10(alph_df['alpha']), alph_df['wdist'], color='red')
+    plt.xlabel('Alpha')
+    plt.ylabel('Wasserstein Distance')
+    plt.show(block=False)
+    plt.title(dataset + ': Alpha vs. Wasserstein Distance')
+    plt.savefig('results/' + dataset + '_alpha_wdist.png')
+    plt.clf()
+
+    plt.plot(np.log10(alph_df['alpha']), alph_df['mse'], color='black', linestyle='dashed', label='MSE')
+    plt.xlabel('Alpha')
+    plt.ylabel('MSE')
+    plt.show(block=False)
+    plt.title(dataset + ': Alpha vs. MSE')
+    plt.savefig('results/' + dataset + '_alpha_mse.png')
+    plt.clf()
+
+
 
     # cross-validation on n_dim
     dim_results = []
@@ -298,8 +319,24 @@ if run_alpha_cv:
         mse, wdist = run_nfr_cv(n_dim=d_i, batch_size=batch_size, C=1., alpha=alpha, emd_method = emd_samples)
         dim_results.append({'n_dim': d_i, 'mse': mse.detach().numpy(), 'wdist': wdist.detach().numpy()})
     dim_df = pd.DataFrame(dim_results)
-    dim_df.to_csv('compas_dim_cv.csv')
-    print('saved, exiting')
+    dim_df.to_csv(dataset + '_dim_cv.csv')
+    print('results/saved, exiting')
+
+    plt.plot(dim_df['n_dim'], dim_df['wdist'], color='red')
+    plt.xlabel('n_dim')
+    plt.ylabel('Wasserstein Distance')
+    plt.show(block=False)
+    plt.title(dataset + ': n_dim vs. Wasserstein Distance')
+    plt.savefig('results/' + dataset + '_dim_wdist.png')
+    plt.clf()
+
+    plt.plot(dim_df['n_dim'], dim_df['mse'], color='black', linestyle='dashed', label='MSE')
+    plt.xlabel('n_dim')
+    plt.ylabel('MSE')
+    plt.show(block=False)
+    plt.title(dataset + ': n_dim vs. MSE')
+    plt.savefig('results/' + dataset + '_dim_mse.png')
+    plt.clf()
 
 
 
