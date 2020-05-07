@@ -17,8 +17,12 @@ from train import train_rep
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import NearestNeighbors
 from dumb_containers import split_data, evaluate_performance_sim
+from math import log10
+import matplotlib.pyplot as plt
 
 import pandas as pd
+
+run_alpha_cv = False
 
 np.random.seed(1)
 
@@ -32,12 +36,36 @@ def get_model_preds(X_train, y_train, P_train, X_test, y_test, P_test, model_nam
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
     y_hats[model_name] = y_test_scores
 
-    print('logistic regression evaluation...')
+    #print('logistic regression evaluation...')
     performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
     return lin_model, y_test_scores, performance
 
 def get_preds_on_full_dataset(x_context, lin_model):
     return sigmoid(((x_context.numpy()).dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
+
+def run_nfr_cv(n_dim, batch_size, C, alpha, emd_method = emd_samples):
+    global X, P, y, df, X_test
+
+    X_no_p = df.drop(['y', 'age_over_40'], axis=1).values
+
+    # declare variables
+    X = torch.tensor(X).float()
+    P = torch.tensor(P).long()
+    # train-test split
+    data_train, data_test = split_data_np((X.data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
+    X_train, P_train, y_train = data_train
+    X_test, P_test, y_test = data_test
+    X_train_no_p = X_train[:, :-1]
+    X_test_no_p = X_test[:, :-1]
+    X_u = X[P==1]
+    X_n = X[P==0]
+
+    # NFR.
+    model_nfr = FairRep(len(X[0]), n_dim)
+    X = torch.tensor(X).float()
+    P = torch.tensor(P).long()
+    return train_rep(model_nfr, 0.01, X, P, n_iter, c_iter=10, batch_size=batch_size, alpha = alpha, C_reg=C)
+
 
 def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3, emd_method=emd_samples):
     global X, P, y, df, X_test
@@ -73,7 +101,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     train_rep(model_nfr, 0.01, X, P, n_iter, 10, batch_size, alpha = alpha, C_reg=0, compute_emd=compute_emd, adv=True, verbose=True)
     results={}
 
-    print('begin testing.')
+    #print('begin testing.')
     X_ori_np = X.data.cpu().numpy()
     # Original.
     print('logistic regression on the original...')
@@ -97,9 +125,9 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     reps[model_name] = None
 
     performance.append(emd_method(X_n[:,:-1], X_u[:,:-1]))
-    print('calculating consistency...')
+    #print('calculating consistency...')
     performance.append(get_consistency(X[:,:-1].data.cpu().numpy(), lin_model,  n_neighbors=k_nbrs))
-    print('calculating stat diff...')
+    #print('calculating stat diff...')
     performance.append(stat_diff(X[:,:-1].data.cpu().numpy(), P, lin_model))
     performance.append(equal_odds(X[:,:-1].data.cpu().numpy(), y, P, lin_model))
     make_cal_plot(X[:,:-1].data.cpu().numpy(), y, P, lin_model, model_name)
@@ -130,15 +158,15 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     reps[model_name] = U
 
     def calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name):
-        print('logistic regression evaluation...')
+        #print('logistic regression evaluation...')
         performance = list(evaluate_performance_sim(y_test, y_test_scores, P_test))
-        print('calculating emd...')
+        #print('calculating emd...')
         performance.append(emd_method(U_0, U_1))
-        print('calculating consistency...')
+        #print('calculating consistency...')
         performance.append(get_consistency(U_np, lin_model, n_neighbors=k_nbrs, based_on=X_ori_np))
-        print('calculating stat diff...')
+        #print('calculating stat diff...')
         performance.append(stat_diff(X_test, P_test, lin_model))
-        print('calculating equal odds...')
+        #print('calculating equal odds...')
         performance.append(equal_odds(X_test, y_test, P_test, lin_model))
         make_cal_plot(X_test, y_test, P_test, lin_model, model_name)
         return performance
@@ -153,13 +181,13 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     U_0 = model_ae_P.encoder(X[:,:-1][P==0]).data
     U_1 = model_ae_P.encoder(X[:,:-1][P==1]).data
     U = model_ae_P.encoder(X[:,:-1]).data
-    print('ae-p emd afterwards: ' + str(emd_method(U_0, U_1)))
+    #print('ae-p emd afterwards: ' + str(emd_method(U_0, U_1)))
     U_np = U.cpu().numpy()
     data_train, data_test = split_data_np((U_np,P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
 
-    print('logistic regression on AE-P...')
+    #print('logistic regression on AE-P...')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
 
@@ -241,11 +269,11 @@ print(cal_emd_resamp(X[:,:-1][(y==0) & (P==0)], X[:,:-1][(y==0) & (P==1)], 50, 1
 
 X = torch.tensor(X).float()
 
-n_dim = 30
+n_dim = 40
 batch_size = 2000
 n_iter = 20
 C=0.1
-alpha = 1000
+alpha = 10**8
 k_nbrs= 1
 
 n_test = 1
@@ -254,42 +282,103 @@ y_hats = {}
 
 preds = {}
 reps = {}
-for k in range(n_test):
-    results_this, y_test_this, reps_this = test_in_one(n_dim=n_dim,
-                     batch_size=batch_size,
-                     n_iter=n_iter,
-                     C=C,
-                     alpha=alpha,
-                    compute_emd=False,
-                    k_nbrs=k_nbrs,
-                    emd_method=lambda x,y: cal_emd_resamp(x, y, 50, 10))
 
-    if k == 0:
-        results = results_this
-        for model in results:
-            results[model] = np.array(results_this[model])/ n_test
-            preds[model] = y_test_this[model] / n_test
-            if torch.is_tensor(reps_this[model]):
-                reps[model] = reps_this[model] / n_test
-            else:
-                reps[model] = None
-    else:
-        for model in results:
-            results[model] += np.array(results_this[model]) / n_test
-            preds[model] += y_test_this[model] / n_test
-            if torch.is_tensor(reps_this[model]):
-                reps[model] += reps_this[model] / n_test
-            else:
-                reps[model] = None
+if run_alpha_cv:
+    dataset = 'bank'
+    # cross-validation on alpha
+    alph_results = []
+    for alph in [10**2, 10**3, 10**4, 10**6, 10**8, 10**10]:
+        mse, wdist = run_nfr_cv(n_dim=n_dim, batch_size=batch_size, C=1., alpha=alph, emd_method = emd_samples)
+        alph_results.append({'alpha': alph, 'mse': mse.detach().numpy(), 'wdist': wdist.detach().numpy()})
+    alph_df = pd.DataFrame(alph_results)
+    alph_df.to_csv('results/' + dataset + 'alpha_cv.csv')
+    print('saved, exiting')
 
-for key, val in preds.items():
-    save_predictions(df, X, y, preds[key], reps[key], key)
+    # make plot
+    plt.plot(np.log10(alph_df['alpha']), alph_df['wdist'], color='red')
+    plt.xlabel('Alpha')
+    plt.ylabel('Wasserstein Distance')
+    plt.show(block=False)
+    plt.title(dataset + ': Alpha vs. Wasserstein Distance')
+    plt.savefig('results/' + dataset + '_alpha_wdist.png')
+    plt.clf()
+
+    plt.plot(np.log10(alph_df['alpha']), alph_df['mse'], color='black', linestyle='dashed', label='MSE')
+    plt.xlabel('Alpha')
+    plt.ylabel('MSE')
+    plt.show(block=False)
+    plt.title(dataset + ': Alpha vs. MSE')
+    plt.savefig('results/' + dataset + '_alpha_mse.png')
+    plt.clf()
 
 
-# TODO combine with csv
-print('Predictions saved.')
-print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs', 'eq_odds'])))
-for key, val in results.items():
-    print('{0:40}: {1}'.format(key, ' '.join([str(np.round(x,3)) for x in val]).ljust(35)))
 
-print('Complete.')
+    # cross-validation on n_dim
+    dim_results = []
+    dim_range = np.linspace(1, len(X[0]), 10)
+    for dim in dim_range:
+        d_i = int(dim)
+        mse, wdist = run_nfr_cv(n_dim=d_i, batch_size=batch_size, C=1., alpha=alpha, emd_method = emd_samples)
+        dim_results.append({'n_dim': d_i, 'mse': mse.detach().numpy(), 'wdist': wdist.detach().numpy()})
+    dim_df = pd.DataFrame(dim_results)
+    dim_df.to_csv(dataset + '_dim_cv.csv')
+    print('results/saved, exiting')
+
+    plt.plot(dim_df['n_dim'], dim_df['wdist'], color='red')
+    plt.xlabel('n_dim')
+    plt.ylabel('Wasserstein Distance')
+    plt.show(block=False)
+    plt.title(dataset + ': n_dim vs. Wasserstein Distance')
+    plt.savefig('results/' + dataset + '_dim_wdist.png')
+    plt.clf()
+
+    plt.plot(dim_df['n_dim'], dim_df['mse'], color='black', linestyle='dashed', label='MSE')
+    plt.xlabel('n_dim')
+    plt.ylabel('MSE')
+    plt.show(block=False)
+    plt.title(dataset + ': n_dim vs. MSE')
+    plt.savefig('results/' + dataset + '_dim_mse.png')
+    plt.clf()
+
+
+
+else:
+    for k in range(n_test):
+        results_this, y_test_this, reps_this = test_in_one(n_dim=n_dim,
+                         batch_size=batch_size,
+                         n_iter=n_iter,
+                         C=C,
+                         alpha=alpha,
+                        compute_emd=False,
+                        k_nbrs=k_nbrs,
+                        emd_method=lambda x,y: cal_emd_resamp(x, y, 50, 10))
+
+        if k == 0:
+            results = results_this
+            for model in results:
+                results[model] = np.array(results_this[model])/ n_test
+                preds[model] = y_test_this[model] / n_test
+                if torch.is_tensor(reps_this[model]):
+                    reps[model] = reps_this[model] / n_test
+                else:
+                    reps[model] = None
+        else:
+            for model in results:
+                results[model] += np.array(results_this[model]) / n_test
+                preds[model] += y_test_this[model] / n_test
+                if torch.is_tensor(reps_this[model]):
+                    reps[model] += reps_this[model] / n_test
+                else:
+                    reps[model] = None
+
+    for key, val in preds.items():
+        save_predictions(df, X, y, preds[key], reps[key], key)
+
+
+    # TODO combine with csv
+    print('Predictions saved.')
+    print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs', 'eq_odds'])))
+    for key, val in results.items():
+        print('{0:40}: {1}'.format(key, ' '.join([str(np.round(x,3)) for x in val]).ljust(35)))
+
+    print('Complete.')

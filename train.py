@@ -39,6 +39,9 @@ def train_rep(model, lr, X, P, n_iter, c_iter, batch_size,
     X_0 = X[P == 0]
     X_1 = X[P == 1]
 
+    mse = 0.
+    wdist = 0.
+
     optim_encoder = optim.Adam(model.encoder.parameters(), lr=lr)
     optim_decoder = optim.Adam(model.decoder.parameters(), lr=lr)
     # print('Critic params:  ')
@@ -48,7 +51,6 @@ def train_rep(model, lr, X, P, n_iter, c_iter, batch_size,
 
     l1_crit = nn.L1Loss(size_average=False)
     n_of_batch = int(len(X) / (batch_size * 2)) * n_iter
-    print('vectors')
     for i in range(n_of_batch):
         #X_n = X_0[np.random.choice(len(X_0), batch_size)]
         #X_u = X_1[np.random.choice(len(X_1), batch_size)]
@@ -65,6 +67,7 @@ def train_rep(model, lr, X, P, n_iter, c_iter, batch_size,
                 for t in range(c_iter):
                     optim_crit.zero_grad()
                     w_dist = model.wdist(X_n, X_u)
+                    #print('Wasserstein distance is NOW: ' + str(w_dist))
                     loss = -w_dist
                     loss.backward(retain_graph=True)
                     optim_crit.step()
@@ -117,6 +120,8 @@ def train_rep(model, lr, X, P, n_iter, c_iter, batch_size,
 
         if verbose:
             update_progress(i, n_of_batch, time_s, text=text + ' ')
+
+    return mse, wdist
 
 
 def cross_entropy(y, y_score):

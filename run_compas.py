@@ -21,8 +21,11 @@ from train import train_rep
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import NearestNeighbors
 from dumb_containers import split_data, evaluate_performance_sim
-
+import matplotlib.pyplot as plt
 import pandas as pd
+from math import log10
+
+run_alpha_cv = False
 
 np.random.seed(1)
 
@@ -42,6 +45,31 @@ def get_model_preds(X_train, y_train, P_train, X_test, y_test, P_test, model_nam
 
 def get_preds_on_full_dataset(x_context, lin_model):
     return sigmoid(((x_context.numpy()).dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
+
+def run_nfr_cv(n_dim, batch_size, C, alpha, emd_method = emd_samples):
+    global X, P, y, df, X_test
+
+    reps = {}
+
+    X_no_p = df.drop(['Y', 'P'], axis=1).values
+
+    # declare variables
+    X = torch.tensor(X).float()
+    P = torch.tensor(P).long()
+    # train-test split
+    data_train, data_test = split_data_np((X.data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
+    X_train, P_train, y_train = data_train
+    X_test, P_test, y_test = data_test
+    X_train_no_p = X_train[:, :-1]
+    X_test_no_p = X_test[:, :-1]
+    X_u = X[P==1]
+    X_n = X[P==0]
+
+    # NFR.
+    model_nfr = FairRep(len(X[0]), n_dim)
+    X = torch.tensor(X).float()
+    P = torch.tensor(P).long()
+    return train_rep(model_nfr, 0.01, X, P, n_iter, c_iter=10, batch_size=batch_size, alpha = alpha, C_reg=C)
 
 def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3, emd_method=emd_samples):
     global X, P, y, df, X_test
@@ -207,7 +235,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     # print('raw data')
     # print(data_raw)
     # data_raw = np.array(data_raw)
-filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'compas_clean.csv')
+filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'compas_new.csv')
 #filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'german_clean.csv')
 try:
     df = pd.read_csv(filepath)
@@ -257,42 +285,104 @@ y_hats = {}
 
 preds = {}
 reps = {}
-for k in range(n_test):
-    results_this, y_test_this, reps_this = test_in_one(n_dim=n_dim,
-                     batch_size=batch_size,
-                     n_iter=n_iter,
-                     C=C,
-                     alpha=alpha,
-                    compute_emd=False,
-                    k_nbrs=k_nbrs,
-                    emd_method=lambda x,y: cal_emd_resamp(x, y, 50, 10))
 
-    if k == 0:
-        results = results_this
-        for model in results:
-            results[model] = np.array(results_this[model])/ n_test
-            preds[model] = y_test_this[model] / n_test
-            if torch.is_tensor(reps_this[model]):
-                reps[model] = reps_this[model] / n_test
-            else:
-                reps[model] = None
-    else:
-        for model in results:
-            results[model] += np.array(results_this[model]) / n_test
-            preds[model] += y_test_this[model] / n_test
-            if torch.is_tensor(reps_this[model]):
-                reps[model] += reps_this[model] / n_test
-            else:
-                reps[model] = None
+if run_alpha_cv:
+    dataset = 'compas'
+    # cross-validation on alpha
+    alph_results = []
+    for alph in [10**2, 10**3, 10**4, 10**6, 10**8, 10**10]:
+        mse, wdist = run_nfr_cv(n_dim=n_dim, batch_size=batch_size, C=1., alpha=alph, emd_method = emd_samples)
+        alph_results.append({'alpha': alph, 'mse': mse.detach().numpy(), 'wdist': wdist.detach().numpy()})
+    alph_df = pd.DataFrame(alph_results)
+    alph_df.to_csv('results/' + dataset + 'alpha_cv.csv')
+    print('saved, exiting')
 
-for key, val in preds.items():
-    save_predictions(df, X, y, preds[key], reps[key], key)
+    # make plot
+    plt.plot(np.log10(alph_df['alpha']), alph_df['wdist'], color='red')
+    plt.xlabel('Alpha')
+    plt.ylabel('Wasserstein Distance')
+    plt.show(block=False)
+    plt.title(dataset + ': Alpha vs. Wasserstein Distance')
+    plt.savefig('results/' + dataset + '_alpha_wdist.png')
+    plt.clf()
+
+    plt.plot(np.log10(alph_df['alpha']), alph_df['mse'], color='black', linestyle='dashed', label='MSE')
+    plt.xlabel('Alpha')
+    plt.ylabel('MSE')
+    plt.show(block=False)
+    plt.title(dataset + ': Alpha vs. MSE')
+    plt.savefig('results/' + dataset + '_alpha_mse.png')
+    plt.clf()
 
 
-# TODO combine with csv
-print('Predictions saved.')
-print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs', 'eq_odds'])))
-for key, val in results.items():
-    print('{0:40}: {1}'.format(key, ' '.join([str(np.round(x,3)) for x in val]).ljust(35)))
 
-print('Complete.')
+    # cross-validation on n_dim
+    dim_results = []
+    dim_range = np.linspace(1, len(X[0]), 10)
+    for dim in dim_range:
+        d_i = int(dim)
+        mse, wdist = run_nfr_cv(n_dim=d_i, batch_size=batch_size, C=1., alpha=alpha, emd_method = emd_samples)
+        dim_results.append({'n_dim': d_i, 'mse': mse.detach().numpy(), 'wdist': wdist.detach().numpy()})
+    dim_df = pd.DataFrame(dim_results)
+    dim_df.to_csv(dataset + '_dim_cv.csv')
+    print('results/saved, exiting')
+
+    plt.plot(dim_df['n_dim'], dim_df['wdist'], color='red')
+    plt.xlabel('n_dim')
+    plt.ylabel('Wasserstein Distance')
+    plt.show(block=False)
+    plt.title(dataset + ': n_dim vs. Wasserstein Distance')
+    plt.savefig('results/' + dataset + '_dim_wdist.png')
+    plt.clf()
+
+    plt.plot(dim_df['n_dim'], dim_df['mse'], color='black', linestyle='dashed', label='MSE')
+    plt.xlabel('n_dim')
+    plt.ylabel('MSE')
+    plt.show(block=False)
+    plt.title(dataset + ': n_dim vs. MSE')
+    plt.savefig('results/' + dataset + '_dim_mse.png')
+    plt.clf()
+
+
+
+
+else:
+    for k in range(n_test):
+        results_this, y_test_this, reps_this = test_in_one(n_dim=n_dim,
+                         batch_size=batch_size,
+                         n_iter=n_iter,
+                         C=C,
+                         alpha=alpha,
+                        compute_emd=False,
+                        k_nbrs=k_nbrs,
+                        emd_method=lambda x,y: cal_emd_resamp(x, y, 50, 10))
+
+        if k == 0:
+            results = results_this
+            for model in results:
+                results[model] = np.array(results_this[model])/ n_test
+                preds[model] = y_test_this[model] / n_test
+                if torch.is_tensor(reps_this[model]):
+                    reps[model] = reps_this[model] / n_test
+                else:
+                    reps[model] = None
+        else:
+            for model in results:
+                results[model] += np.array(results_this[model]) / n_test
+                preds[model] += y_test_this[model] / n_test
+                if torch.is_tensor(reps_this[model]):
+                    reps[model] += reps_this[model] / n_test
+                else:
+                    reps[model] = None
+
+    for key, val in preds.items():
+        save_predictions(df, X, y, preds[key], reps[key], key)
+
+
+    # TODO combine with csv
+    print('Predictions saved.')
+    print('{0:40}: {1}'.format('method', ' '.join(['ks', 'recall', 'precision', 'f1','stat','emd','cons', 'stat_abs', 'eq_odds'])))
+    for key, val in results.items():
+        print('{0:40}: {1}'.format(key, ' '.join([str(np.round(x,3)) for x in val]).ljust(35)))
+
+    print('Complete.')
