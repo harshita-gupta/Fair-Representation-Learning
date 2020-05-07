@@ -10,7 +10,7 @@ from pyemd import emd_samples
 
 from model import FairRep
 from helpers_general import update_progress, normalize, total_correlation, cal_emd_resamp
-from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid, make_cal_plot, save_predictions
+from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid, make_cal_plot, save_predictions, save_decision_boundary_plot
 import time
 import sys
 from train import train_rep
@@ -116,6 +116,9 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     performance.append(stat_diff(X.data.cpu().numpy(), P, lin_model))
     performance.append(equal_odds(X.data.cpu().numpy(), y, P, lin_model))
     make_cal_plot(X.data.cpu().numpy(), y, P, lin_model, model_name)
+    save_decision_boundary_plot(
+        np.concatenate((X_train, X_test)),
+        np.concatenate((y_train, y_test)), np.concatenate((P_train, P_test)), model_name)
 
     results[model_name] = performance
 
@@ -133,6 +136,9 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     performance.append(stat_diff(X[:,:-1].data.cpu().numpy(), P, lin_model))
     performance.append(equal_odds(X[:,:-1].data.cpu().numpy(), y, P, lin_model))
     make_cal_plot(X[:,:-1].data.cpu().numpy(), y, P, lin_model, model_name)
+    save_decision_boundary_plot(
+        np.concatenate((X_train_no_p, X_test_no_p)),
+        np.concatenate((y_train, y_test)), np.concatenate((P_train, P_test)), model_name)
 
     results[model_name] = performance
 
@@ -174,6 +180,9 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
         return performance
 
     performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name)
+    save_decision_boundary_plot(
+        np.concatenate((X_train, X_test)),
+        np.concatenate((y_train, y_test)), np.concatenate((P_train, P_test)), model_name)
     results[model_name] = (performance)
 
 
@@ -196,7 +205,10 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
     y_hats[model_name] = get_preds_on_full_dataset(U, lin_model)
     reps[model_name] = U
-
+    save_decision_boundary_plot(
+        np.concatenate((X_train, X_test)),
+        np.concatenate((y_train, y_test)), np.concatenate((P_train, P_test)), model_name)
+    
 
     performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name)
     results[model_name] = (performance)
@@ -218,6 +230,9 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     y_test_scores = sigmoid((X_test.dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
     y_hats[model_name] = get_preds_on_full_dataset(U, lin_model)
     reps[model_name] = U
+    save_decision_boundary_plot(
+        np.concatenate((X_train, X_test)),
+        np.concatenate((y_train, y_test)), np.concatenate((P_train, P_test)), model_name)
 
     performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name)
     results[model_name] = (performance)

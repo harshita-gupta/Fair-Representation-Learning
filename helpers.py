@@ -1,3 +1,7 @@
+import os
+
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+
 
 import time
 import sys
@@ -7,8 +11,15 @@ import numpy as np
 from pyemd import emd_samples
 from sklearn.neighbors import NearestNeighbors
 from sklearn.calibration import calibration_curve
+from sklearn.linear_model import LogisticRegression
+
 import matplotlib.pyplot as plt
 import torch
+
+
+from hdb_plot import decisionboundaryplot
+import pandas as pd
+
 
 def prettytime(seconds):
     return seconds/3600, seconds/60%60, seconds%60
@@ -133,6 +144,21 @@ def get_consistency(X, classifier, n_neighbors, based_on=None):
     return consistency
 
 
+
+def save_decision_boundary_plot(X, Y, P,
+        model_name, classifier=LogisticRegression):
+    # lin_model = classifier()
+    lin_model = classifier(C=0.1, solver='sag', max_iter=2000)
+    dbplot = decisionboundaryplot.DBPlot(lin_model)
+    plt.figure(figsize=(12, 12), dpi=80)
+    dbplot.fit(X, Y, 0.7)
+    dbplot.plot(
+        show_indices=False,
+        graph_separators=P,
+        scatter_size_scale=.1, legend=True, generate_testpoints=False,
+        model_save_name=model_name)
+
+
 def make_cal_plot(X, y, P, model, model_name):
     """
     Saves a calibration plot for the given model.
@@ -171,6 +197,7 @@ def make_cal_plot(X, y, P, model, model_name):
     plt.legend()
     plt.show(block=False)
     plt.savefig('results/' + model_name + '.png')
+    plt.close('all')
     plt.clf()
 
 def stat_diff(X, P, model):

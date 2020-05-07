@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 from model import FairRep
 from helpers import update_progress, normalize, total_correlation, cal_emd_resamp
-from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid, make_cal_plot, save_predictions
+from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid, make_cal_plot, save_predictions, save_decision_boundary_plot
 import time
 import sys
 from train import train_rep
@@ -26,8 +26,6 @@ from sklearn.ensemble import RandomForestClassifier
 from dumb_containers import split_data, evaluate_performance_sim
 
 from hdb_plot import decisionboundaryplot
-
-from functools import partial
 import pandas as pd
 
 np.random.seed(1)
@@ -37,8 +35,8 @@ def shuffled_np(df):
     return np.random.shuffle(df.values)
 
 
-# def show_decision_boundary(X, Y, P, model_name, classifier=LogisticRegression):
-def show_decision_boundary(X, Y, P,
+# def save_decision_boundary_plot(X, Y, P, model_name, classifier=LogisticRegression):
+def save_decision_boundary_plot(X, Y, P,
         model_name, classifier=LogisticRegression):
     # lin_model = classifier()
     lin_model = classifier(C=C, solver='sag', max_iter=2000)
@@ -118,7 +116,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha, compute_emd=True, k_nbrs=3,
     y_hats[model_name] = get_preds_on_full_dataset(X, lin_model)
     reps[model_name] = None
     print(X_train.shape, X_test.shape)
-    show_decision_boundary(
+    save_decision_boundary_plot(
         np.concatenate((X_train, X_test)),
         np.concatenate((y_train, y_test)), np.concatenate((P_train, P_test)), model_name)
 
@@ -139,7 +137,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha, compute_emd=True, k_nbrs=3,
         X_train_no_p, y_train, P_train, X_test_no_p, y_test, P_test, model_name)
     y_hats[model_name] = get_preds_on_full_dataset(X[:, :-1], lin_model)
     reps[model_name] = None
-    show_decision_boundary(
+    save_decision_boundary_plot(
         np.concatenate((X_train_no_p, X_test_no_p)),
         np.concatenate((y_train, y_test)), np.concatenate((P_train, P_test)), model_name)
 
@@ -170,7 +168,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha, compute_emd=True, k_nbrs=3,
     print('logistic regression on AE...')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
-    show_decision_boundary(
+    save_decision_boundary_plot(
         np.concatenate((X_train, X_test)),
         np.concatenate((y_train, y_test)), np.concatenate((P_train, P_test)), model_name)
     y_test_scores = sigmoid(
@@ -211,7 +209,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha, compute_emd=True, k_nbrs=3,
 
     print('logistic regression on AE-P...')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
-    show_decision_boundary(
+    save_decision_boundary_plot(
         np.concatenate((X_train, X_test)),
         np.concatenate((y_train, y_test)), np.concatenate((P_train, P_test)), model_name)
     lin_model.fit(X_train, y_train)
@@ -238,7 +236,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha, compute_emd=True, k_nbrs=3,
     print('logistic regression on NFR...')
     lin_model = LogisticRegression(C=C, solver='sag', max_iter=2000)
     lin_model.fit(X_train, y_train)
-    show_decision_boundary(
+    save_decision_boundary_plot(
         np.concatenate((X_train, X_test)),
         np.concatenate((y_train, y_test)), np.concatenate((P_train, P_test)), model_name)
 
