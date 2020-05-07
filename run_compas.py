@@ -1,3 +1,8 @@
+import os
+
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
+
 import torch
 import torch.nn as nzn
 import torch.optim as optim
