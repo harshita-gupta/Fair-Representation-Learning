@@ -107,13 +107,14 @@ def total_correlation(X, Y):
     R_sq = S_YX.dot(S_XX_inv).dot(S_XY) / S_YY
     return np.sqrt(R_sq)
 
-
-def cal_emd_resamp(A,B,n_samp,times):
+def cal_emd_resamp(A,B,n_samp,times,bins=2):
     emds = []
+    if bins is None:
+        bins = 2
     for t in range(times):
         idx_a = np.random.choice(len(A), n_samp)
         idx_b = np.random.choice(len(B), n_samp)
-        emds.append(emd_samples(A[idx_a],B[idx_b], bins=2))
+        emds.append(emd_samples(A[idx_a],B[idx_b], bins=bins))
     return np.mean(emds)
 
 def split_data_np(data, ratio):
