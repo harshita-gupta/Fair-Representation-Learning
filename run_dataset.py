@@ -241,6 +241,9 @@ parser.add_argument('--ndim', action='store', type=int)
 parser.add_argument('--protected', action='store', type=str)
 parser.add_argument('--y', action='store', type=str)
 parser.add_argument('--bins', action='store', type=int)
+parser.add_argument('--n_iter', action='store', type=int)
+parser.add_argument('--c', action='store', type=int)
+
 
 args = parser.parse_args()
 
@@ -251,6 +254,8 @@ alpha = 1000
 prot = 'P'
 y_name = 'Y'
 bins = 2
+n_iter = 20
+C=0.1
 
 # if alternatives are entered in the command line, use those instead
 if args.data:
@@ -265,6 +270,10 @@ if args.y:
     y_name = args.y
 if args.bins:
     bins = args.bins
+if args.n_iter:
+    n_iter = args.n_iter
+if args.c:
+    C = args.c
 
 filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', data_name)
 #filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'german_clean.csv')
@@ -310,8 +319,6 @@ print(cal_emd_resamp(X_notp[(y==0) & (P==0)], X_notp[(y==0) & (P==1)], 50, 10, b
 X = torch.tensor(X).float()
 
 batch_size = 2000
-n_iter = 20
-C=0.1
 k_nbrs= 1
 
 n_test = 2
