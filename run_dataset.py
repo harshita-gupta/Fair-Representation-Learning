@@ -9,7 +9,7 @@ import numpy as np
 from pyemd import emd_samples
 
 from model import FairRep
-from helpers_general import update_progress, normalize, total_correlation, cal_emd_resamp
+from helpers import update_progress, normalize, total_correlation, cal_emd_resamp
 from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid, make_cal_plot, save_predictions
 import time
 import sys

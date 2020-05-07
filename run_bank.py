@@ -8,7 +8,7 @@ import numpy as np
 from pyemd import emd_samples
 
 from model import FairRep
-from helpers_bank import update_progress, normalize, total_correlation, cal_emd_resamp
+from helpers import update_progress, normalize, total_correlation, cal_emd_resamp
 from helpers import split_data_np, get_consistency, stat_diff, equal_odds, sigmoid, make_cal_plot, save_predictions
 
 import time
@@ -258,14 +258,14 @@ X_u = X[P==1]
 X_n = X[P==0]
 
 print('original emd distance:')
-print(cal_emd_resamp(X_u, X_n, 100, 10))
+print(cal_emd_resamp(X_u, X_n, 100, 10, 10))
 print('original emd distance without P:')
 
-print(cal_emd_resamp(X_u[:,:-1], X_n[:,:-1], 50, 10))
+print(cal_emd_resamp(X_u[:,:-1], X_n[:,:-1], 50, 10, 10))
 print('original positive group distance without P:')
-print(cal_emd_resamp(X[:,:-1][(y==1) & (P==0)], X[:,:-1][(y==1) & (P==1)], 50, 10))
+print(cal_emd_resamp(X[:,:-1][(y==1) & (P==0)], X[:,:-1][(y==1) & (P==1)], 50, 10, 10))
 print('original negative group distance without P:')
-print(cal_emd_resamp(X[:,:-1][(y==0) & (P==0)], X[:,:-1][(y==0) & (P==1)], 50, 10))
+print(cal_emd_resamp(X[:,:-1][(y==0) & (P==0)], X[:,:-1][(y==0) & (P==1)], 50, 10, 10))
 
 X = torch.tensor(X).float()
 
@@ -351,7 +351,7 @@ else:
                          alpha=alpha,
                         compute_emd=False,
                         k_nbrs=k_nbrs,
-                        emd_method=lambda x,y: cal_emd_resamp(x, y, 50, 10))
+                        emd_method=lambda x,y: cal_emd_resamp(x, y, 50, 10, 10))
 
         if k == 0:
             results = results_this
