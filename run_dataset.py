@@ -44,11 +44,9 @@ def get_preds_on_full_dataset(x_context, lin_model):
     return sigmoid(((x_context.numpy()).dot(lin_model.coef_.T) + lin_model.intercept_).flatten())
 
 def run_nfr_cv(n_dim, batch_size, C, alpha, emd_method = emd_samples):
-    global X, P, y, df, X_test
+    global X, P, y, df, X_test, pcol
 
     reps = {}
-
-    # X_no_p = df.drop([y_name, prot], axis=1).values
 
     # declare variables
     X = torch.tensor(X).float()
@@ -57,8 +55,8 @@ def run_nfr_cv(n_dim, batch_size, C, alpha, emd_method = emd_samples):
     data_train, data_test = split_data_np((X.data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
-    X_train_no_p = X_train[:, :-1]
-    X_test_no_p = X_test[:, :-1]
+    X_train_no_p = np.delete(X_train, pcol, 1)
+    X_test_no_p = np.delete(X_test, pcol, 1)
     X_u = X[P==1]
     X_n = X[P==0]
 
@@ -69,21 +67,20 @@ def run_nfr_cv(n_dim, batch_size, C, alpha, emd_method = emd_samples):
     return train_rep(model_nfr, 0.01, X, P, n_iter, c_iter=10, batch_size=batch_size, alpha = alpha, C_reg=C)
 
 def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3, emd_method=emd_samples):
-    global X, P, y, df, X_test, X_notp
+    global X, P, y, X_test, X_notp, pcol
 
     reps = {}
-
-    # X_no_p = df.drop([y_name, prot], axis=1).values
 
     # declare variables
     X = torch.tensor(X).float()
     P = torch.tensor(P).long()
+    X_notp = torch.tensor(X_notp).float()
     # train-test split
     data_train, data_test = split_data_np((X.data.cpu().numpy(),P.data.cpu().numpy(),y), 0.7)
     X_train, P_train, y_train = data_train
     X_test, P_test, y_test = data_test
-    X_train_no_p = X_train[:, :-1]
-    X_test_no_p = X_test[:, :-1]
+    X_train_no_p = np.delete(X_train, pcol, 1)
+    X_test_no_p = np.delete(X_test, pcol, 1)
     X_u = X[P==1]
     X_n = X[P==0]
 
@@ -122,20 +119,21 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
 
     results[model_name] = performance
 
+
     # Original-P.
     model_name = 'compas_Original-P'
     print('logistic regression on the original-P')
     lin_model, y_test_scores, performance = get_model_preds(X_train_no_p, y_train, P_train, X_test_no_p, y_test, P_test, model_name)
-    y_hats[model_name] = get_preds_on_full_dataset(X[:, :-1], lin_model)
+    y_hats[model_name] = get_preds_on_full_dataset(X_notp, lin_model)
     reps[model_name] = None
 
-    performance.append(emd_method(X_n[:,:-1], X_u[:,:-1]))
+    performance.append(emd_method(X_notp[P==0], X_notp[P==1]))
     print('calculating consistency...')
-    performance.append(get_consistency(X[:,:-1].data.cpu().numpy(), lin_model,  n_neighbors=k_nbrs))
+    performance.append(get_consistency(X_notp.data.cpu().numpy(), lin_model,  n_neighbors=k_nbrs))
     print('calculating stat diff...')
-    performance.append(stat_diff(X[:,:-1].data.cpu().numpy(), P, lin_model))
-    performance.append(equal_odds(X[:,:-1].data.cpu().numpy(), y, P, lin_model))
-    make_cal_plot(X[:,:-1].data.cpu().numpy(), y, P, lin_model, model_name)
+    performance.append(stat_diff(X_notp.data.cpu().numpy(), P, lin_model))
+    performance.append(equal_odds(X_notp.data.cpu().numpy(), y, P, lin_model))
+    make_cal_plot(X_notp.data.cpu().numpy(), y, P, lin_model, model_name)
     save_decision_boundary_plot(
         np.concatenate((X_train_no_p, X_test_no_p)),
         np.concatenate((y_train, y_test)), np.concatenate((P_train, P_test)), model_name)
@@ -189,9 +187,9 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
 
     # AE minus P
     model_name = 'compas_AE_P'
-    U_0 = model_ae_P.encoder(X[:,:-1][P==0]).data
-    U_1 = model_ae_P.encoder(X[:,:-1][P==1]).data
-    U = model_ae_P.encoder(X[:,:-1]).data
+    U_0 = model_ae_P.encoder(X_notp[P==0]).data
+    U_1 = model_ae_P.encoder(X_notp[P==1]).data
+    U = model_ae_P.encoder(X_notp).data
     print('ae-p emd afterwards: ' + str(emd_method(U_0, U_1)))
     U_np = U.cpu().numpy()
     data_train, data_test = split_data_np((U_np,P.data.cpu().numpy(),y), 0.7)
@@ -208,7 +206,7 @@ def test_in_one(n_dim, batch_size, n_iter, C, alpha,compute_emd=True, k_nbrs = 3
     save_decision_boundary_plot(
         np.concatenate((X_train, X_test)),
         np.concatenate((y_train, y_test)), np.concatenate((P_train, P_test)), model_name)
-    
+
 
     performance = calc_perf(y_test, y_test_scores, P_test, U, U_0, U_1, U_np, lin_model, X_test, model_name)
     results[model_name] = (performance)
@@ -303,6 +301,8 @@ print(len(list(df.columns)))
 P = df[prot].values
 y = df[y_name].values
 
+pcol = df.columns.get_loc(prot)
+
 # X contains protected class P
 X = df.drop([y_name], axis=1).values
 
@@ -318,7 +318,6 @@ X_u = X[P==1]
 X_n = X[P==0]
 
 
-# print("compare the unprotected normalized data:", sum(X_n[:,:-1] != X_notp[P==0]) )
 
 
 print('original emd distance:')
