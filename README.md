@@ -23,6 +23,7 @@ To run an experiment on a different dataset, make sure that the dataset is store
 * --n_iter: number of iterations to use while training
 
 For example, if 'dataset.csv' is the name of your file, you can run:
+
 python3 run_dataset.py --data dataset.csv --alpha 100 --protected gender --y outcome
 
 As seen in the example above, all of the command line arguments are optional, and so if any of them are not specifed, then the default option, which are the values specific to the COMPAS dataset, will be used instead. These default settings are:
